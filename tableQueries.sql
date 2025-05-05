@@ -180,3 +180,11 @@ WHERE unit = 'Percent change'
     attribute LIKE '%Upper bound of prediction interval 2025%'
   );
 
+-- full_data_PPIHistoricalForecast
+SELECT * FROM PPIHistoricalForecast;
+
+-- full_data_historicalppi
+SELECT * FROM historicalppi;
+
+-- full_data_ppiforecastarchived
+SELECT * FROM ppiforecastarchived;
