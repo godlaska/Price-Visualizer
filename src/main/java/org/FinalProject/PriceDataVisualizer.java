@@ -9,7 +9,6 @@ import org.jfree.chart.plot.*;
 import org.jfree.chart.renderer.category.*;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.category.DefaultCategoryDataset;
-import org.jfree.data.time.*;
 import org.jfree.data.time.Month;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
@@ -28,13 +27,15 @@ public class PriceDataVisualizer {
     private static Map<String, String> queryMap = new HashMap<>();
     private static JPanel chartPanel;
     private static JPanel checkboxPanel;
-    private static Map<String, JCheckBox> categoryCheckboxes = new LinkedHashMap<>();
+    private static final Map<String, JCheckBox> categoryCheckboxes =
+            new LinkedHashMap<>();
 
     public static void main(String[] args) {
         setupConnectionPool();
         try {
             queryMap = loadQueriesFromFile("tableQueries.sql");
         } catch (IOException e) {
+            System.err.println("Failed to load queries from file: tableQueries.sql");
             e.printStackTrace();
         }
         Runtime.getRuntime().addShutdownHook(new Thread(PriceDataVisualizer::closeConnectionPool));
@@ -64,7 +65,7 @@ public class PriceDataVisualizer {
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.startsWith("--")) {
-                    if (currentKey != null && currentQuery.length() > 0) {
+                    if (currentKey != null && !currentQuery.isEmpty()) {
                         queries.put(currentKey, currentQuery.toString().trim());
                     }
                     currentKey = line.substring(2).trim();
@@ -73,7 +74,7 @@ public class PriceDataVisualizer {
                     currentQuery.append(line).append(" ");
                 }
             }
-            if (currentKey != null && currentQuery.length() > 0) {
+            if (currentKey != null && !currentQuery.isEmpty()) {
                 queries.put(currentKey, currentQuery.toString().trim());
             }
         }
@@ -297,7 +298,6 @@ public class PriceDataVisualizer {
             for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
 
             Vector<Vector<Object>> data = new Vector<>();
-            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
             Map<String, Double> lowerMap = new HashMap<>();
             Map<String, Double> upperMap = new HashMap<>();
 
