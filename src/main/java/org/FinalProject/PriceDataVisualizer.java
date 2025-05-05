@@ -81,6 +81,35 @@ public class PriceDataVisualizer {
         return queries;
     }
 
+    private static DefaultListModel<String> historyModel = new DefaultListModel<>();
+    private static JList<String> historyList = new JList<>(historyModel);
+
+    public static void logQueryToHistory(String sql) {
+        String insert = "INSERT INTO query_history (query_text) VALUES (?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(insert)) {
+            ps.setString(1, sql);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void loadQueryHistory() {
+        historyModel.clear();
+        String select = "SELECT query_text FROM query_history ORDER BY run_timestamp DESC";
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(select)) {
+            while (rs.next()) {
+                String query = rs.getString("query_text").trim();
+                if (!query.isEmpty()) historyModel.addElement(query);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     private static void createAndShowGUI() {
         JFrame frame = new JFrame("Price Data Visualizer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -152,17 +181,76 @@ public class PriceDataVisualizer {
         checkboxScrollPane.setPreferredSize(new Dimension(200, 400));
         centerPanel.add(checkboxScrollPane, BorderLayout.WEST);
 
+        // Right side history panel setup
+        loadQueryHistory();
+        historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        historyList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String selectedSQL = historyList.getSelectedValue();
+                if (selectedSQL != null && !selectedSQL.isBlank()) {
+                    try (Connection conn = getConnection();
+                         Statement stmt = conn.createStatement();
+                         ResultSet rs = stmt.executeQuery(selectedSQL)) {
+                        logQueryToHistory(selectedSQL);
+
+                        ResultSetMetaData meta = rs.getMetaData();
+                        int columnCount = meta.getColumnCount();
+                        Vector<String> columnNames = new Vector<>();
+                        for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
+
+                        Vector<Vector<Object>> data = new Vector<>();
+                        while (rs.next()) {
+                            Vector<Object> row = new Vector<>();
+                            for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
+                            data.add(row);
+                        }
+
+                        JTable table = new JTable();
+                        table.setModel(new DefaultTableModel(data, columnNames));
+
+                        JScrollPane scrollPane = new JScrollPane(table);
+                        JFrame resultFrame = new JFrame("Query Result");
+                        resultFrame.setSize(800, 400);
+                        resultFrame.add(scrollPane);
+                        resultFrame.setVisible(true);
+                    } catch (SQLException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+
         JPanel historyPanel = new JPanel(new BorderLayout());
-        historyPanel.setPreferredSize(new Dimension(250, 0));
+        historyPanel.setPreferredSize(new Dimension(300, 0));
         historyPanel.setBorder(BorderFactory.createTitledBorder("History"));
-        historyPanel.add(new JScrollPane(new JList<>(new DefaultListModel<>())), BorderLayout.CENTER);
+        historyPanel.add(new JScrollPane(historyList), BorderLayout.CENTER);
+
+        JButton clearHistoryButton = new JButton("Clear History");
+        clearHistoryButton.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        clearHistoryButton.setBackground(Color.PINK);
+        clearHistoryButton.addActionListener(e -> {
+            try (Connection conn = getConnection();
+                 Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("DELETE FROM query_history");
+                historyModel.clear();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        });
+
+        JPanel bottomHistoryPanel = new JPanel(new BorderLayout());
+        bottomHistoryPanel.setPreferredSize(new Dimension(300, 200));
+        bottomHistoryPanel.add(clearHistoryButton, BorderLayout.NORTH);
 
         JTextArea descriptionArea = new JTextArea();
         descriptionArea.setLineWrap(true);
         descriptionArea.setWrapStyleWord(true);
         descriptionArea.setEditable(false);
         descriptionArea.setBorder(BorderFactory.createTitledBorder("Description"));
-        historyPanel.add(descriptionArea, BorderLayout.SOUTH);
+        descriptionArea.setPreferredSize(new Dimension(300, 150));
+        bottomHistoryPanel.add(new JScrollPane(descriptionArea), BorderLayout.CENTER);
+
+        historyPanel.add(bottomHistoryPanel, BorderLayout.SOUTH);
         mainPanel.add(historyPanel, BorderLayout.EAST);
 
         frame.getContentPane().add(mainPanel);
@@ -187,6 +275,9 @@ public class PriceDataVisualizer {
         String sqlKey = "full_data_" + tableName;
         String sql = queryMap.get(sqlKey);
         if (sql == null) return;
+
+        logQueryToHistory(sql);
+        loadQueryHistory();
 
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             ResultSetMetaData meta = rs.getMetaData();
@@ -342,6 +433,9 @@ public class PriceDataVisualizer {
         String sqlKey = "full_data_" + tableName + "_for_2025_bounds";
         String sql = queryMap.get(sqlKey);
         if (sql == null) return;
+
+        logQueryToHistory(sql);
+        loadQueryHistory();
 
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             ResultSetMetaData meta = rs.getMetaData();
