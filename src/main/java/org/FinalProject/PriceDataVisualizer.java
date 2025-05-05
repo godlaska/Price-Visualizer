@@ -311,9 +311,19 @@ public class PriceDataVisualizer {
 
                 String attribute = rs.getString("attribute");
                 double value = rs.getDouble("value");
-                String label = tableName.equalsIgnoreCase("CPIForecast")
-                        ? Optional.ofNullable(rs.getString("disaggregate")).filter(s -> !s.isBlank()).orElse(rs.getString("midLevel"))
-                        : rs.getString("producerPriceIndexItem");
+                String label;
+                try {
+                    String disagg = rs.getString("disaggregate");
+                    label = (disagg != null && !disagg.isBlank()) ? disagg : rs.getString("midLevel");
+                } catch (SQLException ex) {
+                    // disaggregate doesn't exist in PPI, so fallback to midLevel or producerPriceIndexItem
+                    try {
+                        String mid = rs.getString("midLevel");
+                        label = (mid != null && !mid.isBlank()) ? mid : rs.getString("producerPriceIndexItem");
+                    } catch (SQLException e2) {
+                        label = rs.getString("producerPriceIndexItem");
+                    }
+                }
 
                 if (attribute.toLowerCase().contains("lower")) lowerMap.put(label, value);
                 else if (attribute.toLowerCase().contains("upper")) upperMap.put(label, value);
@@ -321,33 +331,80 @@ public class PriceDataVisualizer {
 
             dataTable.setModel(new DefaultTableModel(data, columnNames));
 
+            chartPanel.removeAll();
+            checkboxPanel.removeAll();
+            categoryCheckboxes.clear();
+
             Set<String> labels = new TreeSet<>();
             labels.addAll(lowerMap.keySet());
             labels.addAll(upperMap.keySet());
 
+            DefaultCategoryDataset initialDataset = new DefaultCategoryDataset();
             for (String item : labels) {
-                if (lowerMap.containsKey(item)) dataset.addValue(lowerMap.get(item), "Lower Bound", item);
-                if (upperMap.containsKey(item)) dataset.addValue(upperMap.get(item), "Upper Bound", item);
+                JCheckBox cb = new JCheckBox(item, true);
+                cb.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                cb.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+                categoryCheckboxes.put(item, cb);
+                checkboxPanel.add(cb);
+
+                if (lowerMap.containsKey(item)) initialDataset.addValue(lowerMap.get(item), "Lower Bound", item);
+                if (upperMap.containsKey(item)) initialDataset.addValue(upperMap.get(item), "Upper Bound", item);
             }
+
+            JButton toggleAllButton = new JButton("Select/Deselect All");
+            toggleAllButton.addActionListener(e -> {
+                boolean allSelected = categoryCheckboxes.values().stream().allMatch(AbstractButton::isSelected);
+                for (JCheckBox cb : categoryCheckboxes.values()) cb.setSelected(!allSelected);
+            });
+            checkboxPanel.add(toggleAllButton, 0);
+
+            JButton applyButton = new JButton("Apply Filter");
+            applyButton.addActionListener(e -> {
+                DefaultCategoryDataset filteredDataset = new DefaultCategoryDataset();
+                for (String item : categoryCheckboxes.keySet()) {
+                    if (categoryCheckboxes.get(item).isSelected()) {
+                        if (lowerMap.containsKey(item)) filteredDataset.addValue(lowerMap.get(item), "Lower Bound", item);
+                        if (upperMap.containsKey(item)) filteredDataset.addValue(upperMap.get(item), "Upper Bound", item);
+                    }
+                }
+                JFreeChart filteredChart = ChartFactory.createBarChart(
+                        tableName + " 2025 Prediction Intervals",
+                        "Item Category", "Percent Change", filteredDataset);
+                CategoryPlot plot = filteredChart.getCategoryPlot();
+                plot.setBackgroundPaint(Color.WHITE);
+                plot.setDomainGridlinePaint(Color.GRAY);
+                plot.setRangeGridlinePaint(Color.GRAY);
+                CategoryAxis domainAxis = plot.getDomainAxis();
+                domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
+                domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
+                domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
+                BarRenderer renderer = (BarRenderer) plot.getRenderer();
+                renderer.setSeriesPaint(0, new Color(30, 144, 255));
+                renderer.setSeriesPaint(1, new Color(220, 20, 60));
+                renderer.setDrawBarOutline(false);
+                renderer.setItemMargin(0.1);
+                renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new DecimalFormat("0.0'%'") ));
+                renderer.setDefaultItemLabelsVisible(true);
+                renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
+                chartPanel.removeAll();
+                chartPanel.setLayout(new BorderLayout());
+                chartPanel.add(new ChartPanel(filteredChart), BorderLayout.CENTER);
+                chartPanel.validate();
+            });
+            checkboxPanel.add(applyButton);
 
             JFreeChart chart = ChartFactory.createBarChart(
                     tableName + " 2025 Prediction Intervals",
-                    "Item Category", "Percent Change", dataset
-            );
-
-            chart.setBackgroundPaint(Color.WHITE);
-            chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 16));
+                    "Item Category", "Percent Change", initialDataset);
 
             CategoryPlot plot = chart.getCategoryPlot();
             plot.setBackgroundPaint(Color.WHITE);
             plot.setDomainGridlinePaint(Color.GRAY);
             plot.setRangeGridlinePaint(Color.GRAY);
-
             CategoryAxis domainAxis = plot.getDomainAxis();
             domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
             domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
             domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
-
             BarRenderer renderer = (BarRenderer) plot.getRenderer();
             renderer.setSeriesPaint(0, new Color(30, 144, 255));
             renderer.setSeriesPaint(1, new Color(220, 20, 60));
@@ -357,7 +414,6 @@ public class PriceDataVisualizer {
             renderer.setDefaultItemLabelsVisible(true);
             renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
 
-            chartPanel.removeAll();
             chartPanel.setLayout(new BorderLayout());
             chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
             chartPanel.validate();
@@ -365,6 +421,7 @@ public class PriceDataVisualizer {
             e.printStackTrace();
         }
     }
+
 
     private static void closeConnectionPool() {
         if (dataSource != null) dataSource.close();
