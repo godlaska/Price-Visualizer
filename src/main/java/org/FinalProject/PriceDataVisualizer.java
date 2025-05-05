@@ -202,15 +202,45 @@ public class PriceDataVisualizer {
                 for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
                 data.add(row);
 
-                String attribute = rs.getString("attribute");
-                if (!attribute.toLowerCase().contains("mid")) continue;
-                int year = rs.getInt("yearBeingForecast");
-                int month = rs.getInt("monthOfForecast");
-                double value = rs.getDouble("forecastPercentChange");
-                String item = tableName.startsWith("CPI") ? rs.getString("consumerPriceIndexItem") : rs.getString("producerPriceIndexItem");
+                int year, month = 1;
+                double value;
+                String item;
 
-                seriesMap.putIfAbsent(item, new TimeSeries(item));
-                seriesMap.get(item).addOrUpdate(new Month(month, year), value);
+                if (tableName.equalsIgnoreCase("historicalcpi")) {
+                    year = rs.getInt("year");
+                    value = rs.getDouble("percentChange");
+                    item = rs.getString("consumerPriceIndexItem");
+                } else if (tableName.equalsIgnoreCase("historicalppi")) {
+                    year = rs.getInt("year");
+                    value = rs.getDouble("percentChange");
+                    item = rs.getString("producerPriceIndexItem");
+                } else if (tableName.equalsIgnoreCase("CPIHistoricalForecast")) {
+                    String attribute = rs.getString("attribute");
+                    if (!attribute.toLowerCase().contains("mid")) continue;
+                    year = rs.getInt("yearBeingForecast");
+                    month = rs.getInt("monthOfForecast");
+                    value = rs.getDouble("forecastPercentChange");
+                    item = rs.getString("consumerPriceIndexItem");
+                } else if (tableName.equalsIgnoreCase("PPIHistoricalForecast")) {
+                    String attribute = rs.getString("attribute");
+                    if (!attribute.toLowerCase().contains("mid")) continue;
+                    year = rs.getInt("yearBeingForecast");
+                    month = rs.getInt("monthOfForecast");
+                    value = rs.getDouble("forecastPercentChange");
+                    item = rs.getString("producerPriceIndexItem");
+                } else {
+                    String attribute = rs.getString("attribute");
+                    if (!attribute.toLowerCase().contains("mid")) continue;
+                    year = rs.getInt("yearBeingForecast");
+                    month = rs.getInt("monthOfForecast");
+                    value = rs.getDouble("forecastPercentChange");
+                    item = rs.getString("consumerPriceIndexItem") != null ? rs.getString("consumerPriceIndexItem") : rs.getString("producerPriceIndexItem");
+                }
+
+                if (item != null) {
+                    seriesMap.putIfAbsent(item, new TimeSeries(item));
+                    seriesMap.get(item).addOrUpdate(new Month(month, year), value);
+                }
             }
 
             dataTable.setModel(new DefaultTableModel(data, columnNames));
