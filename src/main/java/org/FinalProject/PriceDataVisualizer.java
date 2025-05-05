@@ -2,15 +2,17 @@ package org.FinalProject;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.CategoryAxis;
-import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.*;
+import org.jfree.chart.axis.*;
 import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
-import org.jfree.chart.plot.CategoryPlot;
-import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.chart.plot.*;
+import org.jfree.chart.renderer.category.*;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.time.*;
+import org.jfree.data.time.Month;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -18,12 +20,15 @@ import java.awt.*;
 import java.awt.event.ActionListener;
 import java.io.*;
 import java.sql.*;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class PriceDataVisualizer {
     private static HikariDataSource dataSource;
     private static Map<String, String> queryMap = new HashMap<>();
     private static JPanel chartPanel;
+    private static JPanel checkboxPanel;
+    private static Map<String, JCheckBox> categoryCheckboxes = new LinkedHashMap<>();
 
     public static void main(String[] args) {
         setupConnectionPool();
@@ -114,98 +119,10 @@ public class PriceDataVisualizer {
             String tableName = (String) tableSelector.getSelectedItem();
             if (tableName == null || tableName.isEmpty()) return;
 
-            String sql = switch (tableName) {
-                case "CPIForecast" -> queryMap.get("full_data_CPIForecast_for_2025_bounds");
-                case "PPIForecast" -> queryMap.get("full_data_PPIForecast_for_2025_bounds");
-                default -> "SELECT * FROM " + tableName;
-            };
-
-            try (Connection conn = getConnection();
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
-
-                ResultSetMetaData meta = rs.getMetaData();
-                int columnCount = meta.getColumnCount();
-                Vector<String> columnNames = new Vector<>();
-                for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
-
-                Vector<Vector<Object>> data = new Vector<>();
-                DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-                Map<String, Double> lowerMap = new HashMap<>();
-                Map<String, Double> upperMap = new HashMap<>();
-
-                while (rs.next()) {
-                    Vector<Object> row = new Vector<>();
-                    for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
-                    data.add(row);
-
-                    String unit = rs.getString("unit");
-                    if ("Percent change".equalsIgnoreCase(unit)) {
-                        String attribute = rs.getString("attribute");
-                        double value = rs.getDouble("value");
-                        String label;
-
-                        if ("CPIForecast".equalsIgnoreCase(tableName)) {
-                            String disagg = rs.getString("disaggregate");
-                            String mid = rs.getString("midLevel");
-                            label = (disagg != null && !disagg.isBlank()) ? disagg : mid;
-                        } else if ("PPIForecast".equalsIgnoreCase(tableName)) {
-                            label = rs.getString("producerPriceIndexItem");
-                        } else continue;
-
-                        if (attribute.toLowerCase().contains("lower")) lowerMap.put(label, value);
-                        else if (attribute.toLowerCase().contains("upper")) upperMap.put(label, value);
-                    }
-                }
-
-                dataTable.setModel(new DefaultTableModel(data, columnNames));
-
-                if (tableName.equalsIgnoreCase("CPIForecast") || tableName.equalsIgnoreCase("PPIForecast")) {
-                    Set<String> labels = new TreeSet<>();
-                    labels.addAll(lowerMap.keySet());
-                    labels.addAll(upperMap.keySet());
-
-                    for (String item : labels) {
-                        if (lowerMap.containsKey(item)) dataset.addValue(lowerMap.get(item), "Lower Bound", item);
-                        if (upperMap.containsKey(item)) dataset.addValue(upperMap.get(item), "Upper Bound", item);
-                    }
-
-                    JFreeChart chart = ChartFactory.createBarChart(
-                            tableName + " 2025 Prediction Intervals",
-                            "Item Category", "Percent Change", dataset
-                    );
-
-                    chart.setBackgroundPaint(Color.WHITE);
-                    chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 16));
-
-                    CategoryPlot plot = chart.getCategoryPlot();
-                    plot.setBackgroundPaint(Color.WHITE);
-                    plot.setDomainGridlinePaint(Color.GRAY);
-                    plot.setRangeGridlinePaint(Color.GRAY);
-
-                    CategoryAxis domainAxis = plot.getDomainAxis();
-                    domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
-                    domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
-                    domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
-
-                    BarRenderer renderer = (BarRenderer) plot.getRenderer();
-                    renderer.setSeriesPaint(0, new Color(30, 144, 255));  // Dodger Blue
-                    renderer.setSeriesPaint(1, new Color(220, 20, 60));   // Crimson Red
-                    renderer.setBarPainter(new BarRenderer().getBarPainter());
-                    renderer.setDrawBarOutline(false);
-                    renderer.setItemMargin(0.1);
-                    renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new java.text.DecimalFormat("0.0'%'") ));
-                    renderer.setDefaultItemLabelsVisible(true);
-                    renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
-
-                    chartPanel.removeAll();
-                    chartPanel.setLayout(new BorderLayout());
-                    chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
-                    chartPanel.validate();
-                }
-
-            } catch (SQLException ex) {
-                ex.printStackTrace();
+            if (tableName.equals("CPIForecast") || tableName.equals("PPIForecast")) {
+                showForecastChart(tableName, dataTable);
+            } else {
+                showTableData(tableName, dataTable);
             }
         });
 
@@ -220,13 +137,19 @@ public class PriceDataVisualizer {
         JPanel centerPanel = new JPanel(new BorderLayout());
         chartPanel = new JPanel();
         chartPanel.setPreferredSize(new Dimension(700, 400));
-        chartPanel.setBackground(Color.LIGHT_GRAY);
         centerPanel.add(chartPanel, BorderLayout.CENTER);
 
         JScrollPane dataScrollPane = new JScrollPane(dataTable);
         dataScrollPane.setPreferredSize(new Dimension(700, 200));
         centerPanel.add(dataScrollPane, BorderLayout.SOUTH);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
+
+        checkboxPanel = new JPanel();
+        checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+        checkboxPanel.setBorder(BorderFactory.createTitledBorder("Select Categories"));
+        JScrollPane checkboxScrollPane = new JScrollPane(checkboxPanel);
+        checkboxScrollPane.setPreferredSize(new Dimension(200, 400));
+        centerPanel.add(checkboxScrollPane, BorderLayout.WEST);
 
         JPanel historyPanel = new JPanel(new BorderLayout());
         historyPanel.setPreferredSize(new Dimension(250, 0));
@@ -243,6 +166,204 @@ public class PriceDataVisualizer {
 
         frame.getContentPane().add(mainPanel);
         frame.setVisible(true);
+    }
+
+    private static void refreshTables(JComboBox<String> typeSelector, JComboBox<String> querySelector, JComboBox<String> tableSelector, String[] cpiTables, String[] ppiTables) {
+        String selectedQuery = (String) querySelector.getSelectedItem();
+        String selectedType = (String) typeSelector.getSelectedItem();
+        if ("Show Full Data".equals(selectedQuery)) {
+            tableSelector.removeAllItems();
+            String[] tables = selectedType.equals("Consumer Price Index") ? cpiTables : ppiTables;
+            for (String t : tables) tableSelector.addItem(t);
+            tableSelector.setVisible(true);
+            tableSelector.setSelectedIndex(0);
+        } else {
+            tableSelector.setVisible(false);
+        }
+    }
+
+    private static void showTableData(String tableName, JTable dataTable) {
+        String sqlKey = "full_data_" + tableName;
+        String sql = queryMap.get(sqlKey);
+        if (sql == null) return;
+
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int columnCount = meta.getColumnCount();
+            Vector<String> columnNames = new Vector<>();
+            for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
+
+            Vector<Vector<Object>> data = new Vector<>();
+            Map<String, TimeSeries> seriesMap = new HashMap<>();
+
+            while (rs.next()) {
+                Vector<Object> row = new Vector<>();
+                for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
+                data.add(row);
+
+                String attribute = rs.getString("attribute");
+                if (!attribute.toLowerCase().contains("mid")) continue;
+                int year = rs.getInt("yearBeingForecast");
+                int month = rs.getInt("monthOfForecast");
+                double value = rs.getDouble("forecastPercentChange");
+                String item = tableName.startsWith("CPI") ? rs.getString("consumerPriceIndexItem") : rs.getString("producerPriceIndexItem");
+
+                seriesMap.putIfAbsent(item, new TimeSeries(item));
+                seriesMap.get(item).addOrUpdate(new Month(month, year), value);
+            }
+
+            dataTable.setModel(new DefaultTableModel(data, columnNames));
+            chartPanel.removeAll();
+            checkboxPanel.removeAll();
+            categoryCheckboxes.clear();
+
+            if (!seriesMap.isEmpty()) {
+                TimeSeriesCollection dataset = new TimeSeriesCollection();
+                for (String label : seriesMap.keySet()) {
+                    JCheckBox box = new JCheckBox(label, true);
+                    box.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                    box.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+                    categoryCheckboxes.put(label, box);
+                    checkboxPanel.add(box);
+                    dataset.addSeries(seriesMap.get(label));
+                }
+
+                JButton toggleAllButton = new JButton("Select/Deselect All");
+                toggleAllButton.addActionListener(e -> {
+                    boolean allSelected = categoryCheckboxes.values().stream().allMatch(AbstractButton::isSelected);
+                    for (JCheckBox cb : categoryCheckboxes.values()) {
+                        cb.setSelected(!allSelected);
+                    }
+                });
+                checkboxPanel.add(toggleAllButton, 0);
+
+                JButton applyButton = new JButton("Apply Filter");
+                applyButton.addActionListener(e -> {
+                    TimeSeriesCollection filtered = new TimeSeriesCollection();
+                    for (String label : categoryCheckboxes.keySet()) {
+                        if (categoryCheckboxes.get(label).isSelected()) {
+                            filtered.addSeries(seriesMap.get(label));
+                        }
+                    }
+                    JFreeChart filteredChart = ChartFactory.createTimeSeriesChart(
+                            tableName + " Midpoint Forecasts", "Time", "% Change", filtered);
+                    XYPlot plot = filteredChart.getXYPlot();
+                    plot.setBackgroundPaint(Color.WHITE);
+                    plot.setDomainGridlinePaint(Color.GRAY);
+                    plot.setRangeGridlinePaint(Color.GRAY);
+                    NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
+                    yAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
+                    plot.setRenderer(new XYLineAndShapeRenderer(true, false));
+
+                    chartPanel.removeAll();
+                    chartPanel.setLayout(new BorderLayout());
+                    chartPanel.add(new ChartPanel(filteredChart), BorderLayout.CENTER);
+                    chartPanel.validate();
+                });
+                checkboxPanel.add(applyButton);
+
+                JFreeChart chart = ChartFactory.createTimeSeriesChart(
+                        tableName + " Midpoint Forecasts", "Time", "% Change", dataset);
+                XYPlot plot = chart.getXYPlot();
+                plot.setBackgroundPaint(Color.WHITE);
+                plot.setDomainGridlinePaint(Color.GRAY);
+                plot.setRangeGridlinePaint(Color.GRAY);
+                NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
+                yAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
+                plot.setRenderer(new XYLineAndShapeRenderer(true, false));
+
+                chartPanel.setLayout(new BorderLayout());
+                chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
+            }
+
+            chartPanel.revalidate();
+            chartPanel.repaint();
+            checkboxPanel.revalidate();
+            checkboxPanel.repaint();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void showForecastChart(String tableName, JTable dataTable) {
+        String sqlKey = "full_data_" + tableName + "_for_2025_bounds";
+        String sql = queryMap.get(sqlKey);
+        if (sql == null) return;
+
+        try (Connection conn = getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int columnCount = meta.getColumnCount();
+            Vector<String> columnNames = new Vector<>();
+            for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
+
+            Vector<Vector<Object>> data = new Vector<>();
+            DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+            Map<String, Double> lowerMap = new HashMap<>();
+            Map<String, Double> upperMap = new HashMap<>();
+
+            while (rs.next()) {
+                Vector<Object> row = new Vector<>();
+                for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
+                data.add(row);
+
+                String unit = rs.getString("unit");
+                if (!"Percent change".equalsIgnoreCase(unit)) continue;
+
+                String attribute = rs.getString("attribute");
+                double value = rs.getDouble("value");
+                String label = tableName.equalsIgnoreCase("CPIForecast")
+                        ? Optional.ofNullable(rs.getString("disaggregate")).filter(s -> !s.isBlank()).orElse(rs.getString("midLevel"))
+                        : rs.getString("producerPriceIndexItem");
+
+                if (attribute.toLowerCase().contains("lower")) lowerMap.put(label, value);
+                else if (attribute.toLowerCase().contains("upper")) upperMap.put(label, value);
+            }
+
+            dataTable.setModel(new DefaultTableModel(data, columnNames));
+
+            Set<String> labels = new TreeSet<>();
+            labels.addAll(lowerMap.keySet());
+            labels.addAll(upperMap.keySet());
+
+            for (String item : labels) {
+                if (lowerMap.containsKey(item)) dataset.addValue(lowerMap.get(item), "Lower Bound", item);
+                if (upperMap.containsKey(item)) dataset.addValue(upperMap.get(item), "Upper Bound", item);
+            }
+
+            JFreeChart chart = ChartFactory.createBarChart(
+                    tableName + " 2025 Prediction Intervals",
+                    "Item Category", "Percent Change", dataset
+            );
+
+            chart.setBackgroundPaint(Color.WHITE);
+            chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 16));
+
+            CategoryPlot plot = chart.getCategoryPlot();
+            plot.setBackgroundPaint(Color.WHITE);
+            plot.setDomainGridlinePaint(Color.GRAY);
+            plot.setRangeGridlinePaint(Color.GRAY);
+
+            CategoryAxis domainAxis = plot.getDomainAxis();
+            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
+            domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
+            domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
+
+            BarRenderer renderer = (BarRenderer) plot.getRenderer();
+            renderer.setSeriesPaint(0, new Color(30, 144, 255));
+            renderer.setSeriesPaint(1, new Color(220, 20, 60));
+            renderer.setDrawBarOutline(false);
+            renderer.setItemMargin(0.1);
+            renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new DecimalFormat("0.0'%'") ));
+            renderer.setDefaultItemLabelsVisible(true);
+            renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
+
+            chartPanel.removeAll();
+            chartPanel.setLayout(new BorderLayout());
+            chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
+            chartPanel.validate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void closeConnectionPool() {
