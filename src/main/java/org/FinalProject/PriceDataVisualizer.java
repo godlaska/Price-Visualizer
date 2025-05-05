@@ -4,10 +4,15 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jfree.chart.*;
 import org.jfree.chart.axis.*;
+import org.jfree.chart.block.BlockBorder;
+import org.jfree.chart.labels.ItemLabelAnchor;
+import org.jfree.chart.labels.ItemLabelPosition;
 import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
 import org.jfree.chart.plot.*;
 import org.jfree.chart.renderer.category.*;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.ui.RectangleEdge;
+import org.jfree.chart.ui.TextAnchor;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.time.Month;
 import org.jfree.data.time.TimeSeries;
@@ -21,6 +26,7 @@ import java.io.*;
 import java.sql.*;
 import java.text.DecimalFormat;
 import java.util.*;
+import java.util.List;
 
 public class PriceDataVisualizer {
     private static HikariDataSource dataSource;
@@ -118,11 +124,23 @@ public class PriceDataVisualizer {
         JPanel mainPanel = new JPanel(new BorderLayout());
 
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JComboBox<String> querySelector = new JComboBox<>(new String[]{"", "Show Full Data", "Volatility & Accuracy"});
         JComboBox<String> typeSelector = new JComboBox<>(new String[]{"Consumer Price Index", "Producer Price Index"});
-        JComboBox<String> querySelector = new JComboBox<>(new String[]{"", "Show Full Data"});
         JComboBox<String> tableSelector = new JComboBox<>();
         tableSelector.setVisible(false);
         JTable dataTable = new JTable();
+
+        JLabel yearRangeLabel = new JLabel("Year Range: ");
+        JLabel yearToLabel = new JLabel("to");
+        yearRangeLabel.setVisible(false);
+        yearToLabel.setVisible(false);
+        JSpinner yearFromSpinner = new JSpinner(new SpinnerNumberModel(2015, 1974, 2023, 1));
+        JSpinner yearToSpinner = new JSpinner(new SpinnerNumberModel(2023, 1974, 2023, 1));
+        yearFromSpinner.setVisible(false);
+        yearToSpinner.setVisible(false);
+
+        JButton runQueryButton = new JButton("Run Query");
+        runQueryButton.setVisible(false);
 
         String[] cpiTables = {"CPIForecast", "CPIHistoricalForecast", "historicalcpi", "cpiforecastarchived"};
         String[] ppiTables = {"PPIForecast", "PPIHistoricalForecast", "historicalppi", "ppiforecastarchived"};
@@ -130,14 +148,22 @@ public class PriceDataVisualizer {
         ActionListener refreshTableSelector = e -> {
             String selectedQuery = (String) querySelector.getSelectedItem();
             String selectedType = (String) typeSelector.getSelectedItem();
-            if ("Show Full Data".equals(selectedQuery)) {
-                tableSelector.removeAllItems();
+            tableSelector.removeAllItems();
+
+            boolean isVolatility = "Volatility & Accuracy".equals(selectedQuery);
+            boolean isFullData = "Show Full Data".equals(selectedQuery);
+
+            tableSelector.setVisible(isFullData);
+            yearRangeLabel.setVisible(isVolatility);
+            yearFromSpinner.setVisible(isVolatility);
+            yearToLabel.setVisible(isVolatility);
+            yearToSpinner.setVisible(isVolatility);
+            runQueryButton.setVisible(isVolatility);
+
+            if (isFullData) {
                 String[] tables = selectedType.equals("Consumer Price Index") ? cpiTables : ppiTables;
                 for (String t : tables) tableSelector.addItem(t);
-                tableSelector.setVisible(true);
                 tableSelector.setSelectedIndex(0);
-            } else {
-                tableSelector.setVisible(false);
             }
         };
 
@@ -156,12 +182,28 @@ public class PriceDataVisualizer {
             }
         });
 
-        topPanel.add(new JLabel("Select Data Type: "));
-        topPanel.add(typeSelector);
+        runQueryButton.addActionListener(e -> {
+            String selectedQuery = (String) querySelector.getSelectedItem();
+            String indexType = (String) typeSelector.getSelectedItem();
+
+            if ("Volatility & Accuracy".equals(selectedQuery)) {
+                int yearFrom = (int) yearFromSpinner.getValue();
+                int yearTo = (int) yearToSpinner.getValue();
+                runVolatilityAccuracyQuery(indexType, yearFrom, yearTo);
+            }
+        });
+
         topPanel.add(new JLabel("Select Query: "));
         topPanel.add(querySelector);
+        topPanel.add(new JLabel("Select Type: "));
+        topPanel.add(typeSelector);
         topPanel.add(new JLabel("Select Table: "));
         topPanel.add(tableSelector);
+        topPanel.add(yearRangeLabel);
+        topPanel.add(yearFromSpinner);
+        topPanel.add(yearToLabel);
+        topPanel.add(yearToSpinner);
+        topPanel.add(runQueryButton);
         mainPanel.add(topPanel, BorderLayout.NORTH);
 
         JPanel centerPanel = new JPanel(new BorderLayout());
@@ -179,46 +221,8 @@ public class PriceDataVisualizer {
         checkboxPanel.setBorder(BorderFactory.createTitledBorder("Select Categories"));
         JScrollPane checkboxScrollPane = new JScrollPane(checkboxPanel);
         checkboxScrollPane.setPreferredSize(new Dimension(200, 400));
+        checkboxScrollPane.setMinimumSize(new Dimension(200, 400));
         centerPanel.add(checkboxScrollPane, BorderLayout.WEST);
-
-        // Right side history panel setup
-        loadQueryHistory();
-        historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        historyList.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                String selectedSQL = historyList.getSelectedValue();
-                if (selectedSQL != null && !selectedSQL.isBlank()) {
-                    try (Connection conn = getConnection();
-                         Statement stmt = conn.createStatement();
-                         ResultSet rs = stmt.executeQuery(selectedSQL)) {
-                        logQueryToHistory(selectedSQL);
-
-                        ResultSetMetaData meta = rs.getMetaData();
-                        int columnCount = meta.getColumnCount();
-                        Vector<String> columnNames = new Vector<>();
-                        for (int i = 1; i <= columnCount; i++) columnNames.add(meta.getColumnName(i));
-
-                        Vector<Vector<Object>> data = new Vector<>();
-                        while (rs.next()) {
-                            Vector<Object> row = new Vector<>();
-                            for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
-                            data.add(row);
-                        }
-
-                        JTable table = new JTable();
-                        table.setModel(new DefaultTableModel(data, columnNames));
-
-                        JScrollPane scrollPane = new JScrollPane(table);
-                        JFrame resultFrame = new JFrame("Query Result");
-                        resultFrame.setSize(800, 400);
-                        resultFrame.add(scrollPane);
-                        resultFrame.setVisible(true);
-                    } catch (SQLException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            }
-        });
 
         JPanel historyPanel = new JPanel(new BorderLayout());
         historyPanel.setPreferredSize(new Dimension(300, 0));
@@ -228,9 +232,8 @@ public class PriceDataVisualizer {
         JButton clearHistoryButton = new JButton("Clear History");
         clearHistoryButton.setFont(new Font("SansSerif", Font.PLAIN, 12));
         clearHistoryButton.setBackground(Color.PINK);
-        clearHistoryButton.addActionListener(e -> {
-            try (Connection conn = getConnection();
-                 Statement stmt = conn.createStatement()) {
+        clearHistoryButton.addActionListener(ev -> {
+            try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
                 stmt.executeUpdate("DELETE FROM query_history");
                 historyModel.clear();
             } catch (SQLException ex) {
@@ -257,17 +260,207 @@ public class PriceDataVisualizer {
         frame.setVisible(true);
     }
 
-    private static void refreshTables(JComboBox<String> typeSelector, JComboBox<String> querySelector, JComboBox<String> tableSelector, String[] cpiTables, String[] ppiTables) {
-        String selectedQuery = (String) querySelector.getSelectedItem();
-        String selectedType = (String) typeSelector.getSelectedItem();
-        if ("Show Full Data".equals(selectedQuery)) {
-            tableSelector.removeAllItems();
-            String[] tables = selectedType.equals("Consumer Price Index") ? cpiTables : ppiTables;
-            for (String t : tables) tableSelector.addItem(t);
-            tableSelector.setVisible(true);
-            tableSelector.setSelectedIndex(0);
+    private static void runVolatilityAccuracyQuery(String indexType, int yearFrom, int yearTo) {
+        String table = indexType.equals("Consumer Price Index") ? "historicalcpi" : "historicalppi";
+        String itemColumn = indexType.equals("Consumer Price Index") ? "consumerPriceIndexItem" : "producerPriceIndexItem";
+
+        String sql = String.format("""
+SELECT %s AS item, year, AVG(percentChange) AS avgChange
+FROM %s
+WHERE year BETWEEN %d AND %d
+GROUP BY %s, year
+ORDER BY %s, year
+""", itemColumn, table, yearFrom, yearTo, itemColumn, itemColumn);
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            logQueryToHistory(sql);  // track the query
+            loadQueryHistory();      // Load history after logging the query
+
+            Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>();
+            Set<Integer> years = new TreeSet<>();
+
+            while (rs.next()) {
+                String item = rs.getString("item");
+                int year = rs.getInt("year");
+                double change = rs.getDouble("avgChange");
+
+                years.add(year);
+                dataMap.computeIfAbsent(item, k -> new HashMap<>()).put(year, change);
+            }
+
+            // Store the original dataMap for filtering later
+            final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
+
+            // Initial chart creation with all data
+            DefaultCategoryDataset dataset = createDataset(dataMap, years);
+            JFreeChart chart = createChart(dataset, indexType, yearFrom, yearTo);
+
+            chartPanel.removeAll();
+            chartPanel.setLayout(new BorderLayout());
+            ChartPanel cp = new ChartPanel(chart);
+            cp.setPreferredSize(new Dimension(700, 400));
+            cp.setMouseWheelEnabled(true);  // Enable mouse wheel zooming
+            cp.setDomainZoomable(true);     // Enable zooming on both axes
+            cp.setRangeZoomable(true);
+            chartPanel.add(cp, BorderLayout.CENTER);
+            chartPanel.validate();
+
+            // Build filter checkboxes
+            checkboxPanel.removeAll();
+            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+            categoryCheckboxes.clear();
+
+            // Add a title to the checkbox panel
+            JLabel titleLabel = new JLabel("Select Categories");
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+            checkboxPanel.add(titleLabel);
+
+            // Add checkboxes for each item
+            for (String item : dataMap.keySet()) {
+                JCheckBox box = new JCheckBox(item, true);
+                box.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                box.setAlignmentX(Component.LEFT_ALIGNMENT);
+                box.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                categoryCheckboxes.put(item, box);
+                checkboxPanel.add(box);
+            }
+
+            // Add control buttons
+            JPanel controlPanel = new JPanel();
+            controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
+            controlPanel.setMaximumSize(new Dimension(150, 100));
+            controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JButton selectAll = new JButton("Select All");
+            JButton deselectAll = new JButton("Deselect All");
+            JButton applyFilter = new JButton("Apply Filter");
+
+            selectAll.addActionListener(e -> {
+                categoryCheckboxes.values().forEach(c -> c.setSelected(true));
+            });
+
+            deselectAll.addActionListener(e -> {
+                categoryCheckboxes.values().forEach(c -> c.setSelected(false));
+            });
+
+            applyFilter.addActionListener(e -> {
+                // Create filtered dataset based on selected checkboxes
+                Map<String, Map<Integer, Double>> filteredData = new LinkedHashMap<>();
+                for (Map.Entry<String, JCheckBox> entry : categoryCheckboxes.entrySet()) {
+                    if (entry.getValue().isSelected()) {
+                        // Use the original data from the dataMap
+                        String key = entry.getKey();
+                        filteredData.put(key, originalDataMap.get(key));
+                    }
+                }
+
+                DefaultCategoryDataset filteredDataset = createDataset(filteredData, years);
+                JFreeChart filteredChart = createChart(filteredDataset, indexType, yearFrom, yearTo);
+
+                chartPanel.removeAll();
+                // Use a different variable name to avoid conflict
+                ChartPanel newChartPanel = new ChartPanel(filteredChart);
+                newChartPanel.setPreferredSize(new Dimension(700, 400));
+                newChartPanel.setMouseWheelEnabled(true);
+                newChartPanel.setDomainZoomable(true);
+                newChartPanel.setRangeZoomable(true);
+                chartPanel.add(newChartPanel, BorderLayout.CENTER);
+                chartPanel.revalidate();
+                chartPanel.repaint();
+            });
+
+            controlPanel.add(selectAll);
+            controlPanel.add(deselectAll);
+            controlPanel.add(applyFilter);
+
+            // Add some spacing before control panel
+            checkboxPanel.add(Box.createVerticalStrut(10));
+            checkboxPanel.add(controlPanel);
+            checkboxPanel.revalidate();
+            checkboxPanel.repaint();
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database error: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Helper method to create dataset from data map
+    private static DefaultCategoryDataset createDataset(Map<String, Map<Integer, Double>> dataMap, Set<Integer> years) {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        for (Map.Entry<String, Map<Integer, Double>> entry : dataMap.entrySet()) {
+            String item = entry.getKey();
+            Map<Integer, Double> yearlyData = entry.getValue();
+            for (Integer yr : years) {
+                Double val = yearlyData.get(yr);
+                if (val != null) dataset.addValue(val, item, yr);
+            }
+        }
+        return dataset;
+    }
+
+    // Helper method to create chart with consistent styling
+    private static JFreeChart createChart(DefaultCategoryDataset dataset, String indexType, int yearFrom, int yearTo) {
+        JFreeChart chart = ChartFactory.createLineChart(
+                indexType + " Item Volatility (" + yearFrom + "-" + yearTo + ")",
+                "Year", "Avg % Change", dataset
+        );
+
+        CategoryPlot plot = chart.getCategoryPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setDomainGridlinePaint(Color.GRAY);
+        plot.setRangeGridlinePaint(Color.GRAY);
+
+        LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
+        renderer.setDefaultShapesVisible(false); // Change to false to hide shapes
+        renderer.setDefaultStroke(new BasicStroke(2.0f));
+
+        // Assign distinct colors to each series for better visibility
+        int seriesCount = dataset.getRowCount();
+        for (int i = 0; i < seriesCount; i++) {
+            Color color = getDistinctColor(i, seriesCount);
+            renderer.setSeriesPaint(i, color);
+        }
+
+        // Format axis
+        NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+        rangeAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
+
+        // Improve the legend
+        chart.getLegend().setFrame(BlockBorder.NONE);
+        chart.getLegend().setPosition(RectangleEdge.RIGHT);
+
+        return chart;
+    }
+
+    // Helper method to generate distinct colors for chart series
+    private static Color getDistinctColor(int index, int total) {
+        // Basic color palette
+        Color[] baseColors = {
+                new Color(31, 119, 180),   // blue
+                new Color(255, 127, 14),   // orange
+                new Color(44, 160, 44),    // green
+                new Color(214, 39, 40),    // red
+                new Color(148, 103, 189),  // purple
+                new Color(140, 86, 75),    // brown
+                new Color(227, 119, 194),  // pink
+                new Color(127, 127, 127),  // gray
+                new Color(188, 189, 34),   // olive
+                new Color(23, 190, 207)    // teal
+        };
+
+        if (index < baseColors.length) {
+            return baseColors[index];
         } else {
-            tableSelector.setVisible(false);
+            // Generate additional colors if we have more series than base colors
+            float hue = (float) index / (float) total;
+            return Color.getHSBColor(hue, 0.85f, 0.85f);
         }
     }
 
@@ -362,26 +555,49 @@ public class PriceDataVisualizer {
             categoryCheckboxes.clear();
 
             if (!seriesMap.isEmpty()) {
+                // Set up the checkbox panel with proper layout
+                checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+
+                // Add a title to the checkbox panel
+                JLabel titleLabel = new JLabel("Select Categories");
+                titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+                titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+                titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+                checkboxPanel.add(titleLabel);
+
+                // Create initial dataset with all series
                 TimeSeriesCollection dataset = new TimeSeriesCollection();
-                for (String label : seriesMap.keySet()) {
+                List<String> itemLabels = new ArrayList<>(seriesMap.keySet());
+                Collections.sort(itemLabels); // Sort for consistent order
+
+                for (String label : itemLabels) {
                     JCheckBox box = new JCheckBox(label, true);
-                    box.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    box.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+                    box.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                    box.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                    box.setAlignmentX(Component.LEFT_ALIGNMENT);
                     categoryCheckboxes.put(label, box);
                     checkboxPanel.add(box);
                     dataset.addSeries(seriesMap.get(label));
                 }
 
-                JButton toggleAllButton = new JButton("Select/Deselect All");
-                toggleAllButton.addActionListener(e -> {
-                    boolean allSelected = categoryCheckboxes.values().stream().allMatch(AbstractButton::isSelected);
-                    for (JCheckBox cb : categoryCheckboxes.values()) {
-                        cb.setSelected(!allSelected);
-                    }
-                });
-                checkboxPanel.add(toggleAllButton, 0);
+                // Add control buttons in a vertical layout
+                JPanel controlPanel = new JPanel();
+                controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
+                controlPanel.setMaximumSize(new Dimension(150, 100));
+                controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+                JButton toggleAllButton = new JButton("Select All");
+                JButton deselectAllButton = new JButton("Deselect All");
                 JButton applyButton = new JButton("Apply Filter");
+
+                toggleAllButton.addActionListener(e -> {
+                    categoryCheckboxes.values().forEach(cb -> cb.setSelected(true));
+                });
+
+                deselectAllButton.addActionListener(e -> {
+                    categoryCheckboxes.values().forEach(cb -> cb.setSelected(false));
+                });
+
                 applyButton.addActionListener(e -> {
                     TimeSeriesCollection filtered = new TimeSeriesCollection();
                     for (String label : categoryCheckboxes.keySet()) {
@@ -389,35 +605,38 @@ public class PriceDataVisualizer {
                             filtered.addSeries(seriesMap.get(label));
                         }
                     }
-                    JFreeChart filteredChart = ChartFactory.createTimeSeriesChart(
-                            tableName + " Midpoint Forecasts", "Time", "% Change", filtered);
-                    XYPlot plot = filteredChart.getXYPlot();
-                    plot.setBackgroundPaint(Color.WHITE);
-                    plot.setDomainGridlinePaint(Color.GRAY);
-                    plot.setRangeGridlinePaint(Color.GRAY);
-                    NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
-                    yAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
-                    plot.setRenderer(new XYLineAndShapeRenderer(true, false));
+
+                    JFreeChart filteredChart = createTimeSeriesChart(tableName, filtered);
 
                     chartPanel.removeAll();
+                    ChartPanel cp = new ChartPanel(filteredChart);
+                    cp.setPreferredSize(new Dimension(700, 400));
+                    cp.setMouseWheelEnabled(true);
+                    cp.setDomainZoomable(true);
+                    cp.setRangeZoomable(true);
                     chartPanel.setLayout(new BorderLayout());
-                    chartPanel.add(new ChartPanel(filteredChart), BorderLayout.CENTER);
+                    chartPanel.add(cp, BorderLayout.CENTER);
                     chartPanel.validate();
+                    chartPanel.repaint();
                 });
-                checkboxPanel.add(applyButton);
 
-                JFreeChart chart = ChartFactory.createTimeSeriesChart(
-                        tableName + " Midpoint Forecasts", "Time", "% Change", dataset);
-                XYPlot plot = chart.getXYPlot();
-                plot.setBackgroundPaint(Color.WHITE);
-                plot.setDomainGridlinePaint(Color.GRAY);
-                plot.setRangeGridlinePaint(Color.GRAY);
-                NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
-                yAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
-                plot.setRenderer(new XYLineAndShapeRenderer(true, false));
+                // Add some spacing before control panel
+                checkboxPanel.add(Box.createVerticalStrut(10));
+                controlPanel.add(toggleAllButton);
+                controlPanel.add(deselectAllButton);
+                controlPanel.add(applyButton);
+                checkboxPanel.add(controlPanel);
+
+                // Create and show the initial chart
+                JFreeChart chart = createTimeSeriesChart(tableName, dataset);
 
                 chartPanel.setLayout(new BorderLayout());
-                chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
+                ChartPanel cp = new ChartPanel(chart);
+                cp.setPreferredSize(new Dimension(700, 400));
+                cp.setMouseWheelEnabled(true);
+                cp.setDomainZoomable(true);
+                cp.setRangeZoomable(true);
+                chartPanel.add(cp, BorderLayout.CENTER);
             }
 
             chartPanel.revalidate();
@@ -426,7 +645,44 @@ public class PriceDataVisualizer {
             checkboxPanel.repaint();
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database error: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    // Helper method to create time series chart with consistent styling
+    private static JFreeChart createTimeSeriesChart(String title, TimeSeriesCollection dataset) {
+        JFreeChart chart = ChartFactory.createTimeSeriesChart(
+                title + " Midpoint Forecasts", "Time", "% Change", dataset);
+
+        XYPlot plot = chart.getXYPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setDomainGridlinePaint(Color.GRAY);
+        plot.setRangeGridlinePaint(Color.GRAY);
+
+        // Format y-axis
+        NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
+        yAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
+
+        // Configure renderer
+        XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer(true, false); // Changed to false to hide shapes
+        renderer.setDefaultStroke(new BasicStroke(2.0f));
+
+        // Assign distinct colors to each series
+        int seriesCount = dataset.getSeriesCount();
+        for (int i = 0; i < seriesCount; i++) {
+            Color color = getDistinctColor(i, seriesCount);
+            renderer.setSeriesPaint(i, color);
+            renderer.setSeriesStroke(i, new BasicStroke(2.0f));
+        }
+
+        plot.setRenderer(renderer);
+
+        // Improve the legend
+        chart.getLegend().setFrame(BlockBorder.NONE);
+        chart.getLegend().setPosition(RectangleEdge.RIGHT);
+
+        return chart;
     }
 
     private static void showForecastChart(String tableName, JTable dataTable) {
@@ -485,11 +741,22 @@ public class PriceDataVisualizer {
             labels.addAll(lowerMap.keySet());
             labels.addAll(upperMap.keySet());
 
+            // Set up the checkbox panel with proper layout
+            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+
+            // Add a title to the checkbox panel
+            JLabel titleLabel = new JLabel("Select Categories");
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+            checkboxPanel.add(titleLabel);
+
             DefaultCategoryDataset initialDataset = new DefaultCategoryDataset();
             for (String item : labels) {
                 JCheckBox cb = new JCheckBox(item, true);
-                cb.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                cb.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+                cb.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                cb.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
                 categoryCheckboxes.put(item, cb);
                 checkboxPanel.add(cb);
 
@@ -497,14 +764,24 @@ public class PriceDataVisualizer {
                 if (upperMap.containsKey(item)) initialDataset.addValue(upperMap.get(item), "Upper Bound", item);
             }
 
-            JButton toggleAllButton = new JButton("Select/Deselect All");
-            toggleAllButton.addActionListener(e -> {
-                boolean allSelected = categoryCheckboxes.values().stream().allMatch(AbstractButton::isSelected);
-                for (JCheckBox cb : categoryCheckboxes.values()) cb.setSelected(!allSelected);
-            });
-            checkboxPanel.add(toggleAllButton, 0);
+            // Add control buttons in a vertical layout
+            JPanel controlPanel = new JPanel();
+            controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
+            controlPanel.setMaximumSize(new Dimension(150, 100));
+            controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+            JButton toggleAllButton = new JButton("Select All");
+            JButton deselectAllButton = new JButton("Deselect All");
             JButton applyButton = new JButton("Apply Filter");
+
+            toggleAllButton.addActionListener(e -> {
+                categoryCheckboxes.values().forEach(cb -> cb.setSelected(true));
+            });
+
+            deselectAllButton.addActionListener(e -> {
+                categoryCheckboxes.values().forEach(cb -> cb.setSelected(false));
+            });
+
             applyButton.addActionListener(e -> {
                 DefaultCategoryDataset filteredDataset = new DefaultCategoryDataset();
                 for (String item : categoryCheckboxes.keySet()) {
@@ -513,61 +790,94 @@ public class PriceDataVisualizer {
                         if (upperMap.containsKey(item)) filteredDataset.addValue(upperMap.get(item), "Upper Bound", item);
                     }
                 }
-                JFreeChart filteredChart = ChartFactory.createBarChart(
-                        tableName + " 2025 Prediction Intervals",
-                        "Item Category", "Percent Change", filteredDataset);
-                CategoryPlot plot = filteredChart.getCategoryPlot();
-                plot.setBackgroundPaint(Color.WHITE);
-                plot.setDomainGridlinePaint(Color.GRAY);
-                plot.setRangeGridlinePaint(Color.GRAY);
-                CategoryAxis domainAxis = plot.getDomainAxis();
-                domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
-                domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
-                domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
-                BarRenderer renderer = (BarRenderer) plot.getRenderer();
-                renderer.setSeriesPaint(0, new Color(30, 144, 255));
-                renderer.setSeriesPaint(1, new Color(220, 20, 60));
-                renderer.setDrawBarOutline(false);
-                renderer.setItemMargin(0.1);
-                renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new DecimalFormat("0.0'%'") ));
-                renderer.setDefaultItemLabelsVisible(true);
-                renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
+
+                JFreeChart filteredChart = createBarChart(tableName, filteredDataset);
+
                 chartPanel.removeAll();
+                ChartPanel cp = new ChartPanel(filteredChart);
+                cp.setPreferredSize(new Dimension(700, 400));
+                cp.setMouseWheelEnabled(true);
+                cp.setDomainZoomable(true);
+                cp.setRangeZoomable(true);
                 chartPanel.setLayout(new BorderLayout());
-                chartPanel.add(new ChartPanel(filteredChart), BorderLayout.CENTER);
+                chartPanel.add(cp, BorderLayout.CENTER);
                 chartPanel.validate();
+                chartPanel.repaint();
             });
-            checkboxPanel.add(applyButton);
 
-            JFreeChart chart = ChartFactory.createBarChart(
-                    tableName + " 2025 Prediction Intervals",
-                    "Item Category", "Percent Change", initialDataset);
+            // Add some spacing before control panel
+            checkboxPanel.add(Box.createVerticalStrut(10));
+            controlPanel.add(toggleAllButton);
+            controlPanel.add(deselectAllButton);
+            controlPanel.add(applyButton);
+            checkboxPanel.add(controlPanel);
 
-            CategoryPlot plot = chart.getCategoryPlot();
-            plot.setBackgroundPaint(Color.WHITE);
-            plot.setDomainGridlinePaint(Color.GRAY);
-            plot.setRangeGridlinePaint(Color.GRAY);
-            CategoryAxis domainAxis = plot.getDomainAxis();
-            domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
-            domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
-            domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
-            BarRenderer renderer = (BarRenderer) plot.getRenderer();
-            renderer.setSeriesPaint(0, new Color(30, 144, 255));
-            renderer.setSeriesPaint(1, new Color(220, 20, 60));
-            renderer.setDrawBarOutline(false);
-            renderer.setItemMargin(0.1);
-            renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new DecimalFormat("0.0'%'") ));
-            renderer.setDefaultItemLabelsVisible(true);
-            renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 10));
+            // Create and display the initial chart
+            JFreeChart chart = createBarChart(tableName, initialDataset);
 
             chartPanel.setLayout(new BorderLayout());
-            chartPanel.add(new ChartPanel(chart), BorderLayout.CENTER);
+            ChartPanel cp = new ChartPanel(chart);
+            cp.setPreferredSize(new Dimension(700, 400));
+            cp.setMouseWheelEnabled(true);
+            cp.setDomainZoomable(true);
+            cp.setRangeZoomable(true);
+            chartPanel.add(cp, BorderLayout.CENTER);
+
             chartPanel.validate();
+            checkboxPanel.revalidate();
+            checkboxPanel.repaint();
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database error: " + e.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // Helper method to create bar chart with consistent styling
+    private static JFreeChart createBarChart(String tableName, DefaultCategoryDataset dataset) {
+        JFreeChart chart = ChartFactory.createBarChart(
+                tableName + " 2025 Prediction Intervals",
+                "Item Category", "Percent Change", dataset);
+
+        CategoryPlot plot = chart.getCategoryPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setDomainGridlinePaint(Color.GRAY);
+        plot.setRangeGridlinePaint(Color.GRAY);
+
+        // Format the domain axis (categories)
+        CategoryAxis domainAxis = plot.getDomainAxis();
+        domainAxis.setCategoryLabelPositions(CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
+        domainAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 12));
+        domainAxis.setLabelFont(new Font("SansSerif", Font.BOLD, 12));
+        domainAxis.setMaximumCategoryLabelLines(2);
+
+        // Configure the renderer
+        BarRenderer renderer = (BarRenderer) plot.getRenderer();
+        renderer.setSeriesPaint(0, new Color(30, 144, 255));    // Blue for lower bound
+        renderer.setSeriesPaint(1, new Color(220, 20, 60));     // Red for upper bound
+        renderer.setDrawBarOutline(true);
+        renderer.setDefaultOutlinePaint(Color.DARK_GRAY);
+        renderer.setDefaultOutlineStroke(new BasicStroke(1.0f));
+        renderer.setItemMargin(0.1);
+        renderer.setShadowVisible(false);
+
+        // Set label generator
+        renderer.setDefaultItemLabelGenerator(new StandardCategoryItemLabelGenerator("{2}", new DecimalFormat("0.0'%'")));
+        renderer.setDefaultItemLabelsVisible(true);
+        renderer.setDefaultItemLabelFont(new Font("SansSerif", Font.PLAIN, 11));
+        renderer.setDefaultPositiveItemLabelPosition(new ItemLabelPosition(
+                ItemLabelAnchor.OUTSIDE12, TextAnchor.BOTTOM_CENTER));
+
+        // Format the range axis (values)
+        NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+        rangeAxis.setNumberFormatOverride(new DecimalFormat("0.0'%'"));
+
+        // Improve the legend
+        chart.getLegend().setFrame(BlockBorder.NONE);
+        chart.getLegend().setPosition(RectangleEdge.RIGHT);
+
+        return chart;
+    }
 
     private static void closeConnectionPool() {
         if (dataSource != null) dataSource.close();
