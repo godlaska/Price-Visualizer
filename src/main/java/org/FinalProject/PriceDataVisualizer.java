@@ -221,12 +221,29 @@ public class PriceDataVisualizer {
                     month = rs.getInt("monthOfForecast");
                     value = rs.getDouble("forecastPercentChange");
                     item = rs.getString("consumerPriceIndexItem");
-                } else if (tableName.equalsIgnoreCase("PPIHistoricalForecast")) {
+                } else if (tableName.equalsIgnoreCase("cpiforecastarchived")) {
                     String attribute = rs.getString("attribute");
                     if (!attribute.toLowerCase().contains("mid")) continue;
                     year = rs.getInt("yearBeingForecast");
                     month = rs.getInt("monthOfForecast");
-                    value = rs.getDouble("forecastPercentChange");
+                    String valStr = rs.getString("forecastPercentChange");
+                    try {
+                        value = Double.parseDouble(valStr);
+                    } catch (NumberFormatException ex) {
+                        continue;
+                    }
+                    item = rs.getString("consumerPriceIndexItem");
+                } else if (tableName.equalsIgnoreCase("ppiforecastarchived")) {
+                    String attribute = rs.getString("attribute");
+                    if (!attribute.toLowerCase().contains("mid")) continue;
+                    year = rs.getInt("yearBeingForecast");
+                    month = rs.getInt("monthOfForecast");
+                    String valStr = rs.getString("forecastPercentChange");
+                    try {
+                        value = Double.parseDouble(valStr);
+                    } catch (NumberFormatException ex) {
+                        continue;
+                    }
                     item = rs.getString("producerPriceIndexItem");
                 } else {
                     String attribute = rs.getString("attribute");
@@ -234,7 +251,12 @@ public class PriceDataVisualizer {
                     year = rs.getInt("yearBeingForecast");
                     month = rs.getInt("monthOfForecast");
                     value = rs.getDouble("forecastPercentChange");
-                    item = rs.getString("consumerPriceIndexItem") != null ? rs.getString("consumerPriceIndexItem") : rs.getString("producerPriceIndexItem");
+
+                    if (tableName.toLowerCase().contains("ppi")) {
+                        item = rs.getString("producerPriceIndexItem");
+                    } else {
+                        item = rs.getString("consumerPriceIndexItem");
+                    }
                 }
 
                 if (item != null) {
