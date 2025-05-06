@@ -37,3 +37,29 @@ SELECT * FROM historicalppi;
 
 -- full_data_ppiforecastarchived
 SELECT * FROM ppiforecastarchived;
+
+-- forecast_accuracy_cpi
+SELECT 
+    f.consumerPriceIndexItem AS item,
+    f.yearBeingForecast AS year,
+    AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
+FROM CPIHistoricalForecast f
+JOIN historicalcpi h 
+  ON f.consumerPriceIndexItem = h.consumerPriceIndexItem 
+ AND f.yearBeingForecast = h.year
+WHERE LOWER(f.attribute) LIKE '%mid%'
+GROUP BY f.consumerPriceIndexItem, f.yearBeingForecast
+ORDER BY f.consumerPriceIndexItem, f.yearBeingForecast;
+
+-- forecast_accuracy_ppi
+SELECT 
+    f.producerPriceIndexItem AS item,
+    f.yearBeingForecast AS year,
+    AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
+FROM PPIHistoricalForecast f
+JOIN historicalppi h 
+  ON f.producerPriceIndexItem = h.producerPriceIndexItem 
+ AND f.yearBeingForecast = h.year
+WHERE LOWER(f.attribute) LIKE '%mid%'
+GROUP BY f.producerPriceIndexItem, f.yearBeingForecast
+ORDER BY f.producerPriceIndexItem, f.yearBeingForecast;
