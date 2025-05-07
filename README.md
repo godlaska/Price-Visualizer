@@ -135,4 +135,40 @@ You can check if this worked by going back to your local instance of MySQL and c
 
 <img src="https://github.com/user-attachments/assets/ed5901d2-95a6-4bfd-a02f-ca63b1eb721c" width="1000"/>
 
+There should be data shown in the table. Now we're ready to continue with the rest of the setup!
+
 ---
+
+### 4. Add Primary Keys and ID Columns
+
+1. Go back to the file explorer and open the `automaticSetup.sql` file again.
+2. Scroll down until you see the comment:
+   ```sql
+   -- START OF IDCreation.sql --
+   ```
+3. Copy **everything from that line to the end of the file**.
+4. Return to your SQL tab in MySQL Workbench — the same one where you created the schema and tables.
+5. Paste the copied SQL **below** your existing `CREATE TABLE` statements.
+6. Highlight all the newly pasted lines and click the ⚡ (lightning bolt) icon to execute them.
+   
+<img src="https://github.com/user-attachments/assets/41a67342-9bee-454e-9984-d444bfcbdfa5" width="1000">
+
+📌 This will:
+- Add primary keys to each table  
+- Rename columns to be more SQL-friendly  
+- Create a query history table for tracking your SQL execution
+
+### 🧩 Design Rationale: Adding Auto-Incrementing IDs
+
+### Why We Added Auto-Incrementing IDs to Each Table
+
+None of the original datasets contained natural primary keys-- the values in columns like `Aggregate`, `Disaggregate`, or `Attribute` were often repeated, nullable, or not guaranteed to be unique. This made it impossible to uniquely identify rows, which is essential for reliable data manipulation, joining, and referencing.
+
+To resolve this, we added an `AUTO_INCREMENT` primary key (e.g., `cpiforecast_id`, `ppiforecast_id`, etc.) to every table. This had several purposes specific to this project:
+
+- ✅ **Normalization**: Assigning a unique ID to each row ensures that we follow best practices in relational database design. It also allows for future decomposition into related tables without relying on ambiguous composite keys.
+- 🔗 **Reliable joins**: Many of our queries (as seen in `tableQueries.sql`) involve filtering or aggregating rows across multiple datasets. Having a unique ID allows for clean and efficient joins or references between tables.
+- 📊 **Query tracking and logging**: The `query_history` table we created references specific queries. Having IDs on each source table supports tracking which rows were accessed or transformed during each logged query.
+- 🛠️ **Data safety**: With auto-incrementing IDs, even if multiple rows contain identical data (e.g., two rows with the same item and forecast value), we can still identify and manipulate each row independently without conflict.
+
+In short, adding `AUTO_INCREMENT` IDs was a structural improvement that enabled normalization, future-proofed our design, and supported the advanced querying work seen in this project.
