@@ -35,6 +35,9 @@ public class PriceDataVisualizer {
     private static JPanel checkboxPanel;
     private static final Map<String, JCheckBox> categoryCheckboxes =
             new LinkedHashMap<>();
+    private static JTable displayDataTable;
+    private static DefaultListModel<String> historyModel = new DefaultListModel<>();
+    private static JList<String> historyList = new JList<>(historyModel);
 
     public static void main(String[] args) {
         setupConnectionPool();
@@ -87,9 +90,6 @@ public class PriceDataVisualizer {
         return queries;
     }
 
-    private static DefaultListModel<String> historyModel = new DefaultListModel<>();
-    private static JList<String> historyList = new JList<>(historyModel);
-
     public static void logQueryToHistory(String sql) {
         String insert = "INSERT INTO query_history (query_text) VALUES (?)";
         try (Connection conn = getConnection();
@@ -128,7 +128,8 @@ public class PriceDataVisualizer {
         JComboBox<String> typeSelector = new JComboBox<>(new String[]{"Consumer Price Index", "Producer Price Index"});
         JComboBox<String> tableSelector = new JComboBox<>();
         tableSelector.setVisible(false);
-        JTable dataTable = new JTable();
+
+        displayDataTable = new JTable();
 
         JLabel yearRangeLabel = new JLabel("Year Range: ");
         JLabel yearToLabel = new JLabel("to");
@@ -177,22 +178,23 @@ public class PriceDataVisualizer {
             if (tableName == null || tableName.isEmpty()) return;
 
             if (tableName.equals("CPIForecast") || tableName.equals("PPIForecast")) {
-                showForecastChart(tableName, dataTable);
+                showForecastChart(tableName, displayDataTable);
             } else {
-                showTableData(tableName, dataTable);
+                showTableData(tableName, displayDataTable);
             }
         });
 
         runQueryButton.addActionListener(e -> {
             String selectedQuery = (String) querySelector.getSelectedItem();
             String indexType = (String) typeSelector.getSelectedItem();
+            JPanel currentCenterPanel = (JPanel) chartPanel.getParent(); // Get centerPanel reference
 
             if ("Volatility".equals(selectedQuery)) {
                 int yearFrom = (int) yearFromSpinner.getValue();
                 int yearTo = (int) yearToSpinner.getValue();
-                runVolatilityQuery(indexType, yearFrom, yearTo);
+                runVolatilityQuery(indexType, yearFrom, yearTo, currentCenterPanel);
             } else if ("Forecast Accuracy".equals(selectedQuery)) {
-                runForecastAccuracyQuery(indexType);
+                runForecastAccuracyQuery(indexType, currentCenterPanel);
             }
         });
 
@@ -211,10 +213,11 @@ public class PriceDataVisualizer {
 
         JPanel centerPanel = new JPanel(new BorderLayout());
         chartPanel = new JPanel();
+        chartPanel.setLayout(new BorderLayout());
         chartPanel.setPreferredSize(new Dimension(700, 400));
         centerPanel.add(chartPanel, BorderLayout.CENTER);
 
-        JScrollPane dataScrollPane = new JScrollPane(dataTable);
+        JScrollPane dataScrollPane = new JScrollPane(displayDataTable);
         dataScrollPane.setPreferredSize(new Dimension(700, 200));
         centerPanel.add(dataScrollPane, BorderLayout.SOUTH);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
@@ -300,7 +303,7 @@ public class PriceDataVisualizer {
         frame.setVisible(true);
     }
 
-    private static void runForecastAccuracyQuery(String indexType) {
+    private static void runForecastAccuracyQuery(String indexType, JPanel centerPanel) {
         String sqlKey = indexType.equals("Consumer Price Index") ? "forecast_accuracy_cpi" : "forecast_accuracy_ppi";
         String sql = queryMap.get(sqlKey);
         if (sql == null) {
@@ -315,27 +318,25 @@ public class PriceDataVisualizer {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
-            // Create a DefaultTableModel for displaying the table data
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
             Vector<String> columnNames = new Vector<>();
             for (int i = 1; i <= columnCount; i++) {
                 columnNames.add(metaData.getColumnName(i));
             }
-            Vector<Vector<Object>> tableData = new Vector<>();
+            Vector<Vector<Object>> tableData = new Vector<>(); // For the table model
 
-            Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>();
-            Set<Integer> years = new TreeSet<>();
+            Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>(); // For the chart
+            Set<Integer> years = new TreeSet<>(); // To store unique years for the chart axis
 
             while (rs.next()) {
-                // Add data to the table model
-                Vector<Object> row = new Vector<>();
+                Vector<Object> row = new Vector<>(); // For table
                 for (int i = 1; i <= columnCount; i++) {
                     row.add(rs.getObject(i));
                 }
                 tableData.add(row);
 
-                String item = rs.getString("item");
+                String item = rs.getString("item"); // For chart
                 int year = rs.getInt("year");
                 double error = rs.getDouble("mean_absolute_error");
 
@@ -343,44 +344,29 @@ public class PriceDataVisualizer {
                 dataMap.computeIfAbsent(item, k -> new HashMap<>()).put(year, error);
             }
 
-            // Display the data in the table
-            JTable table = new JTable();
-            table.setModel(new DefaultTableModel(tableData, columnNames));
-            JScrollPane scrollPane = new JScrollPane(table);
-            scrollPane.setPreferredSize(new Dimension(700, 200));
+            // Determine min and max year for the chart title dynamically
+            int minYear = years.isEmpty() ? 0 : Collections.min(years);
+            int maxYear = years.isEmpty() ? 0 : Collections.max(years);
 
-            // Store a copy for filtering later
-            final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
-
-            // Chart creation
             DefaultCategoryDataset dataset = createDataset(dataMap, years);
-            JFreeChart chart = createChart(dataset, indexType + " Forecast Accuracy", Collections.min(years), Collections.max(years));
+            JFreeChart chart = createChart(dataset, indexType + " Forecast Accuracy", minYear, maxYear);
 
-            chartPanel.removeAll();
-            chartPanel.setLayout(new BorderLayout());
+            chartPanel.removeAll(); // Clear previous chart
             ChartPanel cp = new ChartPanel(chart);
             cp.setPreferredSize(new Dimension(700, 400));
             cp.setMouseWheelEnabled(true);
             cp.setDomainZoomable(true);
             cp.setRangeZoomable(true);
+            chartPanel.setLayout(new BorderLayout()); // Ensure chartPanel has a layout
             chartPanel.add(cp, BorderLayout.CENTER);
 
-            // Add the table to the designated scrollPane area
-            JPanel centerPanel = (JPanel) chartPanel.getParent();
-            Component[] components = centerPanel.getComponents();
-            for (Component component : components) {
-                if (component instanceof JScrollPane && !(component instanceof ChartPanel)) {
-                    centerPanel.remove(component);
-                    break;
-                }
-            }
-            centerPanel.add(scrollPane, BorderLayout.SOUTH);
-            centerPanel.revalidate();
-            chartPanel.validate();
+            displayDataTable.setModel(new DefaultTableModel(tableData, columnNames));
 
-            // Build filter checkboxes
+            final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
+            final Vector<Vector<Object>> originalTableData = new Vector<>(tableData); // Store original table data
+
             checkboxPanel.removeAll();
-            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)); // Ensure layout
             categoryCheckboxes.clear();
 
             JLabel titleLabel = new JLabel("Select Categories");
@@ -389,7 +375,7 @@ public class PriceDataVisualizer {
             titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
             checkboxPanel.add(titleLabel);
 
-            for (String item : dataMap.keySet()) {
+            for (String item : dataMap.keySet()) { // Use dataMap keys for checkboxes
                 JCheckBox box = new JCheckBox(item, true);
                 box.setFont(new Font("SansSerif", Font.PLAIN, 12));
                 box.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -410,194 +396,31 @@ public class PriceDataVisualizer {
             selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
             deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
 
-            // Update applyFilter to also filter the table data
             applyFilter.addActionListener(e -> {
-                Map<String, Map<Integer, Double>> filtered = new LinkedHashMap<>();
+                Map<String, Map<Integer, Double>> filteredChartData = new LinkedHashMap<>();
+                Vector<Vector<Object>> filteredTableContent = new Vector<>(); // For the table
+
                 for (Map.Entry<String, JCheckBox> entry : categoryCheckboxes.entrySet()) {
                     if (entry.getValue().isSelected()) {
-                        filtered.put(entry.getKey(), originalDataMap.get(entry.getKey()));
+                        String key = entry.getKey();
+                        if (originalDataMap.containsKey(key)) {
+                            filteredChartData.put(key, originalDataMap.get(key));
+                        }
                     }
                 }
-
-                DefaultCategoryDataset filteredDataset = createDataset(filtered, years);
-                JFreeChart filteredChart = createChart(filteredDataset, indexType + " Forecast Accuracy", Collections.min(years), Collections.max(years));
 
                 // Filter table data based on selected items
-                Vector<Vector<Object>> filteredTableData = new Vector<>();
-                for (Vector<Object> row : tableData) {
+                for (Vector<Object> row : originalTableData) {
                     String rowItem = row.get(0).toString(); // Assuming item is the first column
                     if (categoryCheckboxes.containsKey(rowItem) && categoryCheckboxes.get(rowItem).isSelected()) {
-                        filteredTableData.add(row);
+                        filteredTableContent.add(row);
                     }
                 }
 
-                // Update chart
-                chartPanel.removeAll();
-                ChartPanel newChart = new ChartPanel(filteredChart);
-                newChart.setPreferredSize(new Dimension(700, 400));
-                newChart.setMouseWheelEnabled(true);
-                newChart.setDomainZoomable(true);
-                newChart.setRangeZoomable(true);
-                chartPanel.add(newChart, BorderLayout.CENTER);
-                chartPanel.revalidate();
-                chartPanel.repaint();
-
-                // Update table with filtered data
-                table.setModel(new DefaultTableModel(filteredTableData, columnNames));
-            });
-
-            controlPanel.add(selectAll);
-            controlPanel.add(deselectAll);
-            controlPanel.add(applyFilter);
-            checkboxPanel.add(Box.createVerticalStrut(10));
-            checkboxPanel.add(controlPanel);
-            checkboxPanel.revalidate();
-            checkboxPanel.repaint();
-
-        } catch (SQLException ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(null, "Database error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private static void runVolatilityQuery(String indexType, int yearFrom, int yearTo) {
-        String table = indexType.equals("Consumer Price Index") ? "historicalcpi" : "historicalppi";
-        String itemColumn = indexType.equals("Consumer Price Index") ? "consumerPriceIndexItem" : "producerPriceIndexItem";
-
-        String sql = String.format("""
-        SELECT %s AS item, year, AVG(percentChange) AS avgChange
-        FROM %s
-        WHERE year BETWEEN %d AND %d
-        GROUP BY %s, year
-        ORDER BY %s, year
-        """, itemColumn, table, yearFrom, yearTo, itemColumn, itemColumn);
-
-        try (Connection conn = getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
-            logQueryToHistory(sql);  // track the query
-            loadQueryHistory();      // Load history after logging the query
-
-            // Create a DefaultTableModel for displaying the table data
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            Vector<String> columnNames = new Vector<>();
-            for (int i = 1; i <= columnCount; i++) {
-                columnNames.add(metaData.getColumnName(i));
-            }
-            Vector<Vector<Object>> tableData = new Vector<>();
-
-            Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>();
-            Set<Integer> years = new TreeSet<>();
-
-            while (rs.next()) {
-                // Add data to the table model
-                Vector<Object> row = new Vector<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.add(rs.getObject(i));
-                }
-                tableData.add(row);
-
-                String item = rs.getString("item");
-                int year = rs.getInt("year");
-                double change = rs.getDouble("avgChange");
-
-                years.add(year);
-                dataMap.computeIfAbsent(item, k -> new HashMap<>()).put(year, change);
-            }
-
-            // Display the data in the table
-            JTable table2 = new JTable();
-            table2.setModel(new DefaultTableModel(tableData, columnNames));
-            JScrollPane scrollPane = new JScrollPane(table2);
-            scrollPane.setPreferredSize(new Dimension(700, 200));
-
-            // Store the original dataMap for filtering later
-            final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
-
-            // Initial chart creation with all data
-            DefaultCategoryDataset dataset = createDataset(dataMap, years);
-            JFreeChart chart = createChart(dataset, indexType, yearFrom, yearTo);
-
-            chartPanel.removeAll();
-            chartPanel.setLayout(new BorderLayout());
-            ChartPanel cp = new ChartPanel(chart);
-            cp.setPreferredSize(new Dimension(700, 400));
-            cp.setMouseWheelEnabled(true);  // Enable mouse wheel zooming
-            cp.setDomainZoomable(true);     // Enable zooming on both axes
-            cp.setRangeZoomable(true);
-            chartPanel.add(cp, BorderLayout.CENTER);
-
-            // Add the table to the designated scrollPane area
-            JPanel centerPanel = (JPanel) chartPanel.getParent();
-            Component[] components = centerPanel.getComponents();
-            for (Component component : components) {
-                if (component instanceof JScrollPane && !(component instanceof ChartPanel)) {
-                    centerPanel.remove(component);
-                    break;
-                }
-            }
-            centerPanel.add(scrollPane, BorderLayout.SOUTH);
-            centerPanel.revalidate();
-            chartPanel.validate();
-
-            // Build filter checkboxes
-            checkboxPanel.removeAll();
-            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
-            categoryCheckboxes.clear();
-
-            // Add a title to the checkbox panel
-            JLabel titleLabel = new JLabel("Select Categories");
-            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
-            checkboxPanel.add(titleLabel);
-
-            // Add checkboxes for each item
-            for (String item : dataMap.keySet()) {
-                JCheckBox box = new JCheckBox(item, true);
-                box.setFont(new Font("SansSerif", Font.PLAIN, 12));
-                box.setAlignmentX(Component.LEFT_ALIGNMENT);
-                box.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
-                categoryCheckboxes.put(item, box);
-                checkboxPanel.add(box);
-            }
-
-            // Add control buttons
-            JPanel controlPanel = new JPanel();
-            controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
-            controlPanel.setMaximumSize(new Dimension(150, 100));
-            controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-            JButton selectAll = new JButton("Select All");
-            JButton deselectAll = new JButton("Deselect All");
-            JButton applyFilter = new JButton("Apply Filter");
-
-            selectAll.addActionListener(e -> {
-                categoryCheckboxes.values().forEach(c -> c.setSelected(true));
-            });
-
-            deselectAll.addActionListener(e -> {
-                categoryCheckboxes.values().forEach(c -> c.setSelected(false));
-            });
-
-            applyFilter.addActionListener(e -> {
-                // Create filtered dataset based on selected checkboxes
-                Map<String, Map<Integer, Double>> filteredData = new LinkedHashMap<>();
-                for (Map.Entry<String, JCheckBox> entry : categoryCheckboxes.entrySet()) {
-                    if (entry.getValue().isSelected()) {
-                        // Use the original data from the dataMap
-                        String key = entry.getKey();
-                        filteredData.put(key, originalDataMap.get(key));
-                    }
-                }
-
-                DefaultCategoryDataset filteredDataset = createDataset(filteredData, years);
-                JFreeChart filteredChart = createChart(filteredDataset, indexType, yearFrom, yearTo);
+                DefaultCategoryDataset filteredDataset = createDataset(filteredChartData, years); // Use original 'years'
+                JFreeChart filteredChart = createChart(filteredDataset, indexType + " Forecast Accuracy", minYear, maxYear);
 
                 chartPanel.removeAll();
-                // Use a different variable name to avoid conflict
                 ChartPanel newChartPanel = new ChartPanel(filteredChart);
                 newChartPanel.setPreferredSize(new Dimension(700, 400));
                 newChartPanel.setMouseWheelEnabled(true);
@@ -607,28 +430,163 @@ public class PriceDataVisualizer {
                 chartPanel.revalidate();
                 chartPanel.repaint();
 
-                // Update table data based on selected items
-                Vector<Vector<Object>> filteredTableData = new Vector<>();
-                for (Vector<Object> row : tableData) {
-                    String rowItem = row.get(0).toString(); // Assuming item is the first column
-                    if (categoryCheckboxes.containsKey(rowItem) && categoryCheckboxes.get(rowItem).isSelected()) {
-                        filteredTableData.add(row);
+                displayDataTable.setModel(new DefaultTableModel(filteredTableContent, columnNames));
+            });
+
+            controlPanel.add(selectAll);
+            controlPanel.add(deselectAll);
+            controlPanel.add(applyFilter);
+            checkboxPanel.add(Box.createVerticalStrut(10));
+            checkboxPanel.add(controlPanel);
+
+            centerPanel.revalidate();
+            centerPanel.repaint();
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private static void runVolatilityQuery(String indexType, int yearFrom, int yearTo, JPanel centerPanel) {
+        String table = indexType.equals("Consumer Price Index") ? "historicalcpi" : "historicalppi";
+        String itemColumn = indexType.equals("Consumer Price Index") ? "consumerPriceIndexItem" : "producerPriceIndexItem";
+
+        String sql = String.format("""
+    SELECT %s AS item, year, AVG(percentChange) AS avgChange
+    FROM %s
+    WHERE year BETWEEN %d AND %d
+    GROUP BY %s, year
+    ORDER BY %s, year
+    """, itemColumn, table, yearFrom, yearTo, itemColumn, itemColumn);
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            logQueryToHistory(sql);
+            loadQueryHistory();
+
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            Vector<String> columnNames = new Vector<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames.add(metaData.getColumnName(i));
+            }
+            Vector<Vector<Object>> tableData = new Vector<>(); // For the table model
+
+            Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>(); // For the chart
+            Set<Integer> years = new TreeSet<>();
+
+            while (rs.next()) {
+                Vector<Object> row = new Vector<>(); // For table
+                for (int i = 1; i <= columnCount; i++) {
+                    row.add(rs.getObject(i));
+                }
+                tableData.add(row);
+
+                String item = rs.getString("item"); // For chart
+                int year = rs.getInt("year");
+                double change = rs.getDouble("avgChange");
+
+                years.add(year);
+                dataMap.computeIfAbsent(item, k -> new HashMap<>()).put(year, change);
+            }
+
+            DefaultCategoryDataset dataset = createDataset(dataMap, years);
+            JFreeChart chart = createChart(dataset, indexType + " Item Volatility", yearFrom, yearTo); // Updated title for clarity
+
+            chartPanel.removeAll(); // Clear previous chart
+            ChartPanel cp = new ChartPanel(chart);
+            cp.setPreferredSize(new Dimension(700, 400));
+            cp.setMouseWheelEnabled(true);
+            cp.setDomainZoomable(true);
+            cp.setRangeZoomable(true);
+            chartPanel.setLayout(new BorderLayout()); // Ensure chartPanel has a layout
+            chartPanel.add(cp, BorderLayout.CENTER);
+
+            displayDataTable.setModel(new DefaultTableModel(tableData, columnNames));
+
+            final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
+            final Vector<Vector<Object>> originalTableData = new Vector<>(tableData); // Store original table data for filtering
+
+            checkboxPanel.removeAll();
+            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)); // Ensure layout
+            categoryCheckboxes.clear();
+
+            JLabel titleLabel = new JLabel("Select Categories");
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+            checkboxPanel.add(titleLabel);
+
+            for (String item : dataMap.keySet()) { // Use dataMap keys for checkboxes
+                JCheckBox box = new JCheckBox(item, true);
+                box.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                box.setAlignmentX(Component.LEFT_ALIGNMENT);
+                box.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                categoryCheckboxes.put(item, box);
+                checkboxPanel.add(box);
+            }
+
+            JPanel controlPanel = new JPanel();
+            controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
+            controlPanel.setMaximumSize(new Dimension(150, 100));
+            controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JButton selectAll = new JButton("Select All");
+            JButton deselectAll = new JButton("Deselect All");
+            JButton applyFilter = new JButton("Apply Filter");
+
+            selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
+            deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
+
+            applyFilter.addActionListener(e -> {
+                Map<String, Map<Integer, Double>> filteredChartData = new LinkedHashMap<>();
+                Vector<Vector<Object>> filteredTableContent = new Vector<>();
+
+                for (Map.Entry<String, JCheckBox> entry : categoryCheckboxes.entrySet()) {
+                    if (entry.getValue().isSelected()) {
+                        String key = entry.getKey();
+                        if (originalDataMap.containsKey(key)) {
+                            filteredChartData.put(key, originalDataMap.get(key));
+                        }
                     }
                 }
 
-                table2.setModel(new DefaultTableModel(filteredTableData,
-                        columnNames));
+                // Filter table data based on selected items
+                for (Vector<Object> row : originalTableData) {
+                    String rowItem = row.get(0).toString(); // Assuming item is the first column
+                    if (categoryCheckboxes.containsKey(rowItem) && categoryCheckboxes.get(rowItem).isSelected()) {
+                        filteredTableContent.add(row);
+                    }
+                }
+
+                DefaultCategoryDataset filteredDataset = createDataset(filteredChartData, years);
+                JFreeChart filteredChart = createChart(filteredDataset, indexType + " Item Volatility", yearFrom, yearTo);
+
+                chartPanel.removeAll();
+                ChartPanel newChartPanel = new ChartPanel(filteredChart);
+                newChartPanel.setPreferredSize(new Dimension(700, 400));
+                newChartPanel.setMouseWheelEnabled(true);
+                newChartPanel.setDomainZoomable(true);
+                newChartPanel.setRangeZoomable(true);
+                chartPanel.add(newChartPanel, BorderLayout.CENTER);
+                chartPanel.revalidate();
+                chartPanel.repaint();
+
+                displayDataTable.setModel(new DefaultTableModel(filteredTableContent, columnNames));
             });
 
             controlPanel.add(selectAll);
             controlPanel.add(deselectAll);
             controlPanel.add(applyFilter);
 
-            // Add some spacing before control panel
             checkboxPanel.add(Box.createVerticalStrut(10));
             checkboxPanel.add(controlPanel);
-            checkboxPanel.revalidate();
-            checkboxPanel.repaint();
+
+            centerPanel.revalidate();
+            centerPanel.repaint();
 
         } catch (SQLException ex) {
             ex.printStackTrace();
