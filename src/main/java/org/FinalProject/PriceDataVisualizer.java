@@ -146,6 +146,22 @@ public class PriceDataVisualizer {
         String[] cpiTables = {"CPIForecast", "CPIHistoricalForecast", "historicalcpi", "cpiforecastarchived"};
         String[] ppiTables = {"PPIForecast", "PPIHistoricalForecast", "historicalppi", "ppiforecastarchived"};
 
+        JTextArea descriptionArea = new JTextArea();
+        descriptionArea.setLineWrap(true);
+        descriptionArea.setWrapStyleWord(true);
+        descriptionArea.setEditable(false);
+        descriptionArea.setBorder(BorderFactory.createTitledBorder("Description"));
+        descriptionArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
+
+        String welcomeSplashText = "Welcome to the Food Price Data Visualizer! Use this " +
+                "tool to explore consumer and producer item " +
+                "forecasts, track accuracy of price " +
+                "predictions, compare forecasting methods, " +
+                "analyze volatility, and assess prediction confidence.";
+        descriptionArea.setText(welcomeSplashText);
+
+        descriptionArea.setPreferredSize(new Dimension(300, 150));
+
         ActionListener refreshTableSelector = e -> {
             String selectedQuery = (String) querySelector.getSelectedItem();
             String selectedType = (String) typeSelector.getSelectedItem();
@@ -168,6 +184,28 @@ public class PriceDataVisualizer {
                 for (String t : tables) tableSelector.addItem(t);
                 tableSelector.setSelectedIndex(0);
             }
+
+            String description = switch (selectedQuery) {
+                case "Show Full Data" ->
+                        "Displays the complete dataset for forecasts and historical values. "
+                                + "You can explore CPI and PPI tables individually, including archived and current forecast values.";
+
+                case "Volatility" ->
+                        "Analyzes volatility by calculating the average annual percent change for each category. "
+                                + "This helps identify which food price categories have been most stable or unstable over time.";
+
+                case "Forecast Accuracy" ->
+                        "Measures the accuracy of forecasts by comparing predicted percent changes to actual observed values. "
+                                + "The chart and table display mean absolute error for each category and year, helping evaluate model reliability.";
+
+                case "Methodology Comparison" ->
+                        "Compares old vs. new forecasting methodologies (pre- and post-September 2023) side-by-side. "
+                                + "Each category is plotted with two lines: one from the archived (old) method and one from the updated (new) model, "
+                                + "highlighting any shifts in forecasting behavior or assumptions.";
+
+                default -> welcomeSplashText;
+            };
+            descriptionArea.setText(description);
         };
 
         querySelector.addActionListener(refreshTableSelector);
@@ -290,13 +328,6 @@ public class PriceDataVisualizer {
         JPanel bottomHistoryPanel = new JPanel(new BorderLayout());
         bottomHistoryPanel.setPreferredSize(new Dimension(300, 200));
         bottomHistoryPanel.add(clearHistoryButton, BorderLayout.NORTH);
-
-        JTextArea descriptionArea = new JTextArea();
-        descriptionArea.setLineWrap(true);
-        descriptionArea.setWrapStyleWord(true);
-        descriptionArea.setEditable(false);
-        descriptionArea.setBorder(BorderFactory.createTitledBorder("Description"));
-        descriptionArea.setPreferredSize(new Dimension(300, 150));
         bottomHistoryPanel.add(new JScrollPane(descriptionArea), BorderLayout.CENTER);
 
         historyPanel.add(bottomHistoryPanel, BorderLayout.SOUTH);
