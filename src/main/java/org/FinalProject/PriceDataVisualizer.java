@@ -124,7 +124,7 @@ public class PriceDataVisualizer {
         JPanel mainPanel = new JPanel(new BorderLayout());
 
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JComboBox<String> querySelector = new JComboBox<>(new String[]{"", "Show Full Data", "Volatility", "Forecast Accuracy"});
+        JComboBox<String> querySelector = new JComboBox<>(new String[]{"", "Show Full Data", "Volatility", "Forecast Accuracy", "Methodology Comparison"});
         JComboBox<String> typeSelector = new JComboBox<>(new String[]{"Consumer Price Index", "Producer Price Index"});
         JComboBox<String> tableSelector = new JComboBox<>();
         tableSelector.setVisible(false);
@@ -154,13 +154,14 @@ public class PriceDataVisualizer {
             boolean isVolatility = "Volatility".equals(selectedQuery);
             boolean isFullData = "Show Full Data".equals(selectedQuery);
             boolean isAccuracy = "Forecast Accuracy".equals(selectedQuery);
+            boolean isMethodology = "Methodology Comparison".equals(selectedQuery);
 
             tableSelector.setVisible(isFullData);
             yearRangeLabel.setVisible(isVolatility);
             yearFromSpinner.setVisible(isVolatility);
             yearToLabel.setVisible(isVolatility);
             yearToSpinner.setVisible(isVolatility);
-            runQueryButton.setVisible(isVolatility || isAccuracy);
+            runQueryButton.setVisible(isVolatility || isAccuracy || isMethodology);
 
             if (isFullData) {
                 String[] tables = selectedType.equals("Consumer Price Index") ? cpiTables : ppiTables;
@@ -195,6 +196,8 @@ public class PriceDataVisualizer {
                 runVolatilityQuery(indexType, yearFrom, yearTo, currentCenterPanel);
             } else if ("Forecast Accuracy".equals(selectedQuery)) {
                 runForecastAccuracyQuery(indexType, currentCenterPanel);
+            } else if ("Methodology Comparison".equals(selectedQuery)) {
+                runMethodologyComparisonQuery(indexType, currentCenterPanel);
             }
         });
 
@@ -301,6 +304,159 @@ public class PriceDataVisualizer {
 
         frame.getContentPane().add(mainPanel);
         frame.setVisible(true);
+    }
+
+    // Method to compare old and new forecast methodologies with side-by-side line charts
+// Method to compare old and new forecast methodologies with side-by-side line charts
+    private static void runMethodologyComparisonQuery(String indexType, JPanel centerPanel) {
+        String sqlKey = indexType.equals("Consumer Price Index") ? "old_vs_new_methodology_cpi" : "old_vs_new_methodology_ppi";
+        String sql = queryMap.get(sqlKey);
+        if (sql == null) {
+            JOptionPane.showMessageDialog(null, "No query found for " + sqlKey, "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        logQueryToHistory(sql);
+        loadQueryHistory();
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            ResultSetMetaData meta = rs.getMetaData();
+            int columnCount = meta.getColumnCount();
+            Vector<String> columnNames = new Vector<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames.add(meta.getColumnName(i));
+            }
+            Vector<Vector<Object>> tableData = new Vector<>();
+            Map<String, TimeSeries> seriesMap = new LinkedHashMap<>();
+
+            while (rs.next()) {
+                Vector<Object> row = new Vector<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    row.add(rs.getObject(i));
+                }
+                tableData.add(row);
+
+                String item = rs.getString("item");
+                int year = rs.getInt("year");
+                int month = rs.getInt("month");
+
+                double oldVal = rs.getDouble("old_forecast");
+                double newVal = rs.getDouble("new_forecast");
+
+                String oldLabel = item + " (Old)";
+                String newLabel = item + " (New)";
+
+                seriesMap.putIfAbsent(oldLabel, new TimeSeries(oldLabel));
+                seriesMap.putIfAbsent(newLabel, new TimeSeries(newLabel));
+
+                seriesMap.get(oldLabel).addOrUpdate(new Month(month, year), oldVal);
+                seriesMap.get(newLabel).addOrUpdate(new Month(month, year), newVal);
+            }
+
+            final Vector<Vector<Object>> originalTableData = new Vector<>(tableData);
+            final Vector<String> originalColumnNames = new Vector<>(columnNames);
+
+            displayDataTable.setModel(new DefaultTableModel(tableData, columnNames));
+            chartPanel.removeAll();
+            checkboxPanel.removeAll();
+            categoryCheckboxes.clear();
+
+            checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
+            JLabel titleLabel = new JLabel("Select Categories");
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
+            checkboxPanel.add(titleLabel);
+
+            // Group checkboxes by base item (not old/new)
+            Set<String> baseItems = new TreeSet<>();
+            for (String label : seriesMap.keySet()) {
+                baseItems.add(label.replace(" (Old)", "").replace(" (New)", ""));
+            }
+
+            TimeSeriesCollection dataset = new TimeSeriesCollection();
+            for (String baseItem : baseItems) {
+                JCheckBox cb = new JCheckBox(baseItem, true);
+                cb.setFont(new Font("SansSerif", Font.PLAIN, 12));
+                cb.setAlignmentX(Component.LEFT_ALIGNMENT);
+                cb.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+                categoryCheckboxes.put(baseItem, cb);
+                checkboxPanel.add(cb);
+                dataset.addSeries(seriesMap.get(baseItem + " (Old)"));
+                dataset.addSeries(seriesMap.get(baseItem + " (New)"));
+            }
+
+            // Control buttons
+            JPanel controlPanel = new JPanel();
+            controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
+            controlPanel.setMaximumSize(new Dimension(150, 100));
+            controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JButton selectAll = new JButton("Select All");
+            JButton deselectAll = new JButton("Deselect All");
+            JButton applyFilter = new JButton("Apply Filter");
+
+            selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
+            deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
+
+            applyFilter.addActionListener(e -> {
+                TimeSeriesCollection filteredDataset = new TimeSeriesCollection();
+                Vector<Vector<Object>> filteredTableContent = new Vector<>();
+
+                for (String item : categoryCheckboxes.keySet()) {
+                    if (categoryCheckboxes.get(item).isSelected()) {
+                        filteredDataset.addSeries(seriesMap.get(item + " (Old)"));
+                        filteredDataset.addSeries(seriesMap.get(item + " (New)"));
+                    }
+                }
+
+                for (Vector<Object> row : originalTableData) {
+                    String rowItem = row.get(0).toString();
+                    if (categoryCheckboxes.containsKey(rowItem) && categoryCheckboxes.get(rowItem).isSelected()) {
+                        filteredTableContent.add(row);
+                    }
+                }
+
+                JFreeChart filteredChart = createTimeSeriesChart(indexType + " Methodology Comparison", filteredDataset);
+                chartPanel.removeAll();
+                ChartPanel cp = new ChartPanel(filteredChart);
+                cp.setPreferredSize(new Dimension(700, 400));
+                cp.setMouseWheelEnabled(true);
+                cp.setDomainZoomable(true);
+                cp.setRangeZoomable(true);
+                chartPanel.add(cp, BorderLayout.CENTER);
+                chartPanel.validate();
+                chartPanel.repaint();
+
+                displayDataTable.setModel(new DefaultTableModel(filteredTableContent, originalColumnNames));
+            });
+
+            controlPanel.add(selectAll);
+            controlPanel.add(deselectAll);
+            controlPanel.add(applyFilter);
+            checkboxPanel.add(Box.createVerticalStrut(10));
+            checkboxPanel.add(controlPanel);
+
+            JFreeChart chart = createTimeSeriesChart(indexType + " Methodology Comparison", dataset);
+            ChartPanel cp = new ChartPanel(chart);
+            cp.setPreferredSize(new Dimension(700, 400));
+            cp.setMouseWheelEnabled(true);
+            cp.setDomainZoomable(true);
+            cp.setRangeZoomable(true);
+            chartPanel.setLayout(new BorderLayout());
+            chartPanel.add(cp, BorderLayout.CENTER);
+
+            chartPanel.revalidate();
+            chartPanel.repaint();
+            checkboxPanel.revalidate();
+            checkboxPanel.repaint();
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Database error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private static void runForecastAccuracyQuery(String indexType, JPanel centerPanel) {
