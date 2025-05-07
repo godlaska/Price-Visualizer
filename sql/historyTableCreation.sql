@@ -1,0 +1,5 @@
+CREATE TABLE query_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  query_text TEXT NOT NULL,
+  run_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
