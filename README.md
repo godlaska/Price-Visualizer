@@ -246,10 +246,13 @@ Once Java 17 is installed and your database is fully set up, you can launch the 
 - You should see a dropdown menu, query options, and a table/chart panel.
 - If you get a database connection error, double-check that:
   - Your MySQL server is **running**
-  - The username is `root` and password is `pass` (or whatever you set)
+  - The username is `root` and password is `pass` (or whatever you set). This can be found if you open PriceDataVisualizer.java (src/main/java/org/FinalProject/PriceDataVisualizer.java) and look iin setupConnectionPool();
+  - <img src="https://github.com/user-attachments/assets/aaec1686-0eed-4da1-95a7-455f82096500" width="600">
   - The schema `foodprices` exists and contains the expected tables
 
+If everything worked correctly, this should be the window that pops up...
 <img src="https://github.com/user-attachments/assets/36113090-9869-48b3-854c-d0be84339518" width="1000">
 
+Enjoy exploring this application! Attatched below is a video where I give an overview of all the features and functionality. 
 ---
 Video Demonstration WIP
