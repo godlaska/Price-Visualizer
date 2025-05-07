@@ -63,3 +63,35 @@ JOIN historicalppi h
 WHERE LOWER(f.attribute) LIKE '%mid%'
 GROUP BY f.producerPriceIndexItem, f.yearBeingForecast
 ORDER BY f.producerPriceIndexItem, f.yearBeingForecast;
+
+-- old_vs_new_methodology_cpi
+# Compares percent forecasts between old (archived) and new (historical) CPI forecast methods
+SELECT 
+    a.consumerPriceIndexItem AS item,
+    a.yearBeingForecast AS year,
+    a.monthBeingForecast AS month,
+    a.forecastPercentChange AS old_forecast,
+    h.forecastPercentChange AS new_forecast,
+    (h.forecastPercentChange - a.forecastPercentChange) AS forecast_difference
+FROM cpiforecastarchived a
+JOIN CPIHistoricalForecast h 
+  ON a.consumerPriceIndexItem = h.consumerPriceIndexItem
+  AND a.yearBeingForecast = h.yearBeingForecast
+  AND a.monthBeingForecast = h.monthBeingForecast
+ORDER BY item, year, month;
+
+-- old_vs_new_methodology_ppi
+# Compares percent forecasts between old (archived) and new (historical) PPI forecast methods
+SELECT 
+    a.producerPriceIndexItem AS item,
+    a.yearBeingForecast AS year,
+    a.monthBeingForecast AS month,
+    a.forecastPercentChange AS old_forecast,
+    h.forecastPercentChange AS new_forecast,
+    (h.forecastPercentChange - a.forecastPercentChange) AS forecast_difference
+FROM ppiforecastarchived a
+JOIN PPIHistoricalForecast h 
+  ON a.producerPriceIndexItem = h.producerPriceIndexItem
+  AND a.yearBeingForecast = h.yearBeingForecast
+  AND a.monthBeingForecast = h.monthBeingForecast
+ORDER BY item, year, month;
