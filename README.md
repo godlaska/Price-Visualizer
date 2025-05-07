@@ -279,10 +279,94 @@ All external libraries are either bundled with the project or should be included
 
 ---
 
-## Enjoy exploring this application! Attached below is a video where I give an overview of all the features and functionality. 
+### 🧠 Application Features & How to Use Them
 
-### All Features
- - WIP
+The Price Visualizer application includes a variety of powerful features that help you interact with and analyze food price data effectively. Below is a complete list of every core feature and how to use it:
 
-### Video
+---
+
+#### 📊 1. Full Data Viewer
+- **What it does**: Displays raw data from any CPI or PPI table in tabular and chart form.
+- **How to use**:
+  1. Select **"Show Full Data"** from the Query dropdown.
+  2. Choose either **Consumer Price Index** or **Producer Price Index**.
+  3. Use the **Table dropdown** to select a dataset (e.g., `CPIForecast`, `historicalppi`, `cpiforecastarchived`, etc.).
+  4. The table appears below, and if applicable, a time series chart is generated.
+  5. Use checkboxes on the left to filter which items appear in the chart.
+  6. Use **Select All / Deselect All / Apply Filter** buttons to manage checkboxes.
+
+---
+
+#### 📈 2. Forecast Bounds (Midpoint, Lower, Upper)
+- **What it does**: Visualizes 2025 CPI/PPI forecast bounds for each item.
+- **How to use**:
+  1. Choose **"Show Full Data"** and select `CPIForecast` or `PPIForecast`.
+  2. The bar chart will automatically load forecast bounds (Lower & Upper) for 2025.
+  3. Use the left-hand checkboxes to include/exclude specific categories.
+
+---
+
+#### 📉 3. Volatility Analysis
+- **What it does**: Measures volatility using average annual percent change for each category.
+- **How to use**:
+  1. Select **"Volatility"** from the Query dropdown.
+  2. Choose CPI or PPI.
+  3. Set the **Year Range** using the two spinners.
+  4. Click **Run Query** to generate the volatility chart and table.
+  5. Use checkboxes to filter items from the chart and table.
+  6. Click **Apply Filter** to refresh the view based on your selections.
+
+---
+
+#### 🎯 4. Forecast Accuracy Evaluation
+- **What it does**: Compares forecasted vs. actual values using mean absolute error.
+- **How to use**:
+  1. Select **"Forecast Accuracy"** from the Query dropdown.
+  2. Choose CPI or PPI.
+  3. Click **Run Query**.
+  4. A line chart and table will show the average forecast error per category and year.
+  5. Use checkboxes to explore trends for specific items.
+
+---
+
+#### 🔬 5. Methodology Comparison (Old vs. New)
+- **What it does**: Compares archived vs. updated forecast models for CPI and PPI.
+- **How to use**:
+  1. Select **"Methodology Comparison"**.
+  2. Choose CPI or PPI.
+  3. Click **Run Query**.
+  4. A time series chart will show both forecasts (old and new) per item.
+  5. Use the left-hand checkboxes to control which categories are shown.
+
+---
+
+#### 🕰️ 6. Query History Panel
+- **What it does**: Logs every query you've executed.
+- **How to use**:
+  1. View the **History panel** on the right side of the window.
+  2. Click on any previous query to re-run it and display the result.
+  3. Click **Clear History** to remove all logs.
+
+---
+
+#### 🗂️ 7. Data Filtering with Checkboxes
+- **What it does**: Provides dynamic control over which data series appear in charts.
+- **How to use**:
+  1. Use checkboxes on the left-hand panel to select or deselect categories.
+  2. Click **Apply Filter** to update both the chart and the table.
+  3. Use **Select All** or **Deselect All** to quickly manage selections.
+
+---
+
+#### 📄 8. Table Viewer with Scroll and Export-Friendly Layout
+- **What it does**: Displays query results in a scrollable, export-friendly format.
+- **How to use**:
+  - Scroll through rows in the lower section of the application window.
+  - You can copy-paste or export this data manually for further use.
+
+---
+
+This feature set was designed to make food price data more transparent, explorable, and insightful for analysis.
+
+### Video Demonstration
 Video Demonstration WIP
