@@ -77,7 +77,10 @@ public class PriceDataVisualizer {
      */
     private static void setupConnectionPool() {
         HikariConfig config = new HikariConfig();
+        // Make sure the table name reflects the actual database name. If you
+        // followed the documentation exactly, this shouldn't need changed
         config.setJdbcUrl("jdbc:mysql://localhost:3306/foodprices");
+        // Username and password should be replaced with actual credentials
         config.setUsername("root");
         config.setPassword("pass");
         config.setMaximumPoolSize(5);
@@ -104,6 +107,7 @@ public class PriceDataVisualizer {
         StringBuilder currentQuery = new StringBuilder();
         String currentKey = null;
 
+        // Read SQL file, add all queries to map, indicated by a --
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -114,10 +118,12 @@ public class PriceDataVisualizer {
                     }
                     currentKey = line.substring(2).trim();
                     currentQuery = new StringBuilder();
+                // Skip empty lines and comments
                 } else if (!line.isEmpty() && !line.startsWith("#")) {
                     currentQuery.append(line).append(" ");
                 }
             }
+            // Add the last query if it exists
             if (currentKey != null && !currentQuery.isEmpty()) {
                 queries.put(currentKey, currentQuery.toString().trim());
             }
@@ -130,6 +136,7 @@ public class PriceDataVisualizer {
      * @param sql the SQL query string to log
      */
     public static void logQueryToHistory(String sql) {
+        // Log the query to the history table
         String insert = "INSERT INTO query_history (query_text) VALUES (?)";
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(insert)) {
@@ -146,10 +153,12 @@ public class PriceDataVisualizer {
      */
     public static void loadQueryHistory() {
         historyModel.clear();
+        // Load the query history from the database
         String select = "SELECT query_text FROM query_history ORDER BY run_timestamp DESC";
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(select)) {
+            // Populate the history model with the results
             while (rs.next()) {
                 String query = rs.getString("query_text").trim();
                 if (!query.isEmpty()) historyModel.addElement(query);
@@ -163,20 +172,24 @@ public class PriceDataVisualizer {
      * Creates and displays the main GUI for the application.
      */
     private static void createAndShowGUI() {
+        // Set up the main frame
         JFrame frame = new JFrame("Price Data Visualizer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1000, 800);
 
         JPanel mainPanel = new JPanel(new BorderLayout());
 
+        // Set up the menu bar
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JComboBox<String> querySelector = new JComboBox<>(new String[]{"", "Show Full Data", "Volatility", "Forecast Accuracy", "Methodology Comparison"});
         JComboBox<String> typeSelector = new JComboBox<>(new String[]{"Consumer Price Index", "Producer Price Index"});
         JComboBox<String> tableSelector = new JComboBox<>();
         tableSelector.setVisible(false);
 
+        // Initialize the data table
         displayDataTable = new JTable();
 
+        // Set up year range query components
         JLabel yearRangeLabel = new JLabel("Year Range: ");
         JLabel yearToLabel = new JLabel("to");
         yearRangeLabel.setVisible(false);
@@ -189,9 +202,11 @@ public class PriceDataVisualizer {
         JButton runQueryButton = new JButton("Run Query");
         runQueryButton.setVisible(false);
 
+        // Table selection
         String[] cpiTables = {"CPIForecast", "CPIHistoricalForecast", "historicalcpi", "cpiforecastarchived"};
         String[] ppiTables = {"PPIForecast", "PPIHistoricalForecast", "historicalppi", "ppiforecastarchived"};
 
+        // Set up description area
         JTextArea descriptionArea = new JTextArea();
         descriptionArea.setLineWrap(true);
         descriptionArea.setWrapStyleWord(true);
@@ -199,6 +214,7 @@ public class PriceDataVisualizer {
         descriptionArea.setBorder(BorderFactory.createTitledBorder("Description"));
         descriptionArea.setFont(new Font("SansSerif", Font.PLAIN, 14));
 
+        // Default description text
         String welcomeSplashText = "Welcome to the Food Price Data Visualizer! Use this " +
                 "tool to explore consumer and producer item " +
                 "forecasts, track accuracy of price " +
@@ -208,6 +224,7 @@ public class PriceDataVisualizer {
 
         descriptionArea.setPreferredSize(new Dimension(300, 150));
 
+        // Logic for query selection
         ActionListener refreshTableSelector = e -> {
             String selectedQuery = (String) querySelector.getSelectedItem();
             String selectedType = (String) typeSelector.getSelectedItem();
@@ -218,6 +235,7 @@ public class PriceDataVisualizer {
             boolean isAccuracy = "Forecast Accuracy".equals(selectedQuery);
             boolean isMethodology = "Methodology Comparison".equals(selectedQuery);
 
+            // Enable/disable components based on query selection
             tableSelector.setVisible(isFullData);
             yearRangeLabel.setVisible(isVolatility);
             yearFromSpinner.setVisible(isVolatility);
@@ -225,12 +243,15 @@ public class PriceDataVisualizer {
             yearToSpinner.setVisible(isVolatility);
             runQueryButton.setVisible(isVolatility || isAccuracy || isMethodology);
 
+            // If the query is "Show Full Data", show the table selector with
+            // CPI and PPI tables
             if (isFullData) {
                 String[] tables = selectedType.equals("Consumer Price Index") ? cpiTables : ppiTables;
                 for (String t : tables) tableSelector.addItem(t);
                 tableSelector.setSelectedIndex(0);
             }
 
+            // Description text based on selected query
             String description = switch (selectedQuery) {
                 case "Show Full Data" ->
                         "Displays the complete dataset for forecasts and historical values. "
@@ -254,9 +275,11 @@ public class PriceDataVisualizer {
             descriptionArea.setText(description);
         };
 
+        // Add action listeners to components
         querySelector.addActionListener(refreshTableSelector);
         typeSelector.addActionListener(refreshTableSelector);
 
+        // Table selection logic
         tableSelector.addActionListener(e -> {
             if (!tableSelector.isVisible()) return;
             String tableName = (String) tableSelector.getSelectedItem();
@@ -269,11 +292,13 @@ public class PriceDataVisualizer {
             }
         });
 
+        // Run query button action
         runQueryButton.addActionListener(e -> {
             String selectedQuery = (String) querySelector.getSelectedItem();
             String indexType = (String) typeSelector.getSelectedItem();
             JPanel currentCenterPanel = (JPanel) chartPanel.getParent(); // Get centerPanel reference
 
+            // Run the appropriate query based on selection
             if ("Volatility".equals(selectedQuery)) {
                 int yearFrom = (int) yearFromSpinner.getValue();
                 int yearTo = (int) yearToSpinner.getValue();
@@ -285,6 +310,7 @@ public class PriceDataVisualizer {
             }
         });
 
+        // Top panel layout
         topPanel.add(new JLabel("Select Query: "));
         topPanel.add(querySelector);
         topPanel.add(new JLabel("Select Type: "));
@@ -298,17 +324,20 @@ public class PriceDataVisualizer {
         topPanel.add(runQueryButton);
         mainPanel.add(topPanel, BorderLayout.NORTH);
 
+        // Center panel layout
         JPanel centerPanel = new JPanel(new BorderLayout());
         chartPanel = new JPanel();
         chartPanel.setLayout(new BorderLayout());
         chartPanel.setPreferredSize(new Dimension(700, 400));
         centerPanel.add(chartPanel, BorderLayout.CENTER);
 
+        // Set up the display data table
         JScrollPane dataScrollPane = new JScrollPane(displayDataTable);
         dataScrollPane.setPreferredSize(new Dimension(700, 200));
         centerPanel.add(dataScrollPane, BorderLayout.SOUTH);
         mainPanel.add(centerPanel, BorderLayout.CENTER);
 
+        // Filtering checkbox setup
         checkboxPanel = new JPanel();
         checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
         checkboxPanel.setBorder(BorderFactory.createTitledBorder("Select Categories"));
@@ -317,11 +346,13 @@ public class PriceDataVisualizer {
         checkboxScrollPane.setMinimumSize(new Dimension(200, 400));
         centerPanel.add(checkboxScrollPane, BorderLayout.WEST);
 
+        // History panel setup
         JPanel historyPanel = new JPanel(new BorderLayout());
         historyPanel.setPreferredSize(new Dimension(300, 0));
         historyPanel.setBorder(BorderFactory.createTitledBorder("History"));
         historyPanel.add(new JScrollPane(historyList), BorderLayout.CENTER);
 
+        // Clear history button
         JButton clearHistoryButton = new JButton("Clear History");
         clearHistoryButton.setFont(new Font("SansSerif", Font.PLAIN, 12));
         clearHistoryButton.setBackground(Color.PINK);
@@ -334,6 +365,8 @@ public class PriceDataVisualizer {
             }
         });
 
+        // History list setup and logic. If the user selects a query
+        // from the history, it will run that query.
         historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         historyList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -371,6 +404,7 @@ public class PriceDataVisualizer {
             }
         });
 
+        // Setup for the bottom history panel
         JPanel bottomHistoryPanel = new JPanel(new BorderLayout());
         bottomHistoryPanel.setPreferredSize(new Dimension(300, 200));
         bottomHistoryPanel.add(clearHistoryButton, BorderLayout.NORTH);
@@ -389,6 +423,7 @@ public class PriceDataVisualizer {
      * @param centerPanel the center panel of the GUI
      */
     private static void runMethodologyComparisonQuery(String indexType, JPanel centerPanel) {
+        // Get the SQL query based on the index type
         String sqlKey = indexType.equals("Consumer Price Index") ? "old_vs_new_methodology_cpi" : "old_vs_new_methodology_ppi";
         String sql = queryMap.get(sqlKey);
         if (sql == null) {
@@ -406,13 +441,17 @@ public class PriceDataVisualizer {
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
             Vector<String> columnNames = new Vector<>();
+            // Get column names for the table
             for (int i = 1; i <= columnCount; i++) {
                 columnNames.add(meta.getColumnName(i));
             }
+
+            // Prepare data for the table and chart
             Vector<Vector<Object>> tableData = new Vector<>();
             Map<String, TimeSeries> seriesMap = new LinkedHashMap<>();
 
             while (rs.next()) {
+                // Populate table data
                 Vector<Object> row = new Vector<>();
                 for (int i = 1; i <= columnCount; i++) {
                     row.add(rs.getObject(i));
@@ -436,14 +475,17 @@ public class PriceDataVisualizer {
                 seriesMap.get(newLabel).addOrUpdate(new Month(month, year), newVal);
             }
 
+            // Create the dataset for the chart
             final Vector<Vector<Object>> originalTableData = new Vector<>(tableData);
             final Vector<String> originalColumnNames = new Vector<>(columnNames);
 
+            // Reset the table model
             displayDataTable.setModel(new DefaultTableModel(tableData, columnNames));
             chartPanel.removeAll();
             checkboxPanel.removeAll();
             categoryCheckboxes.clear();
 
+            // Set up the checkbox panel
             checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS));
             JLabel titleLabel = new JLabel("Select Categories");
             titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
@@ -457,6 +499,8 @@ public class PriceDataVisualizer {
                 baseItems.add(label.replace(" (Old)", "").replace(" (New)", ""));
             }
 
+            // Create checkboxes for each base item
+            // Documentation at https://www.jfree.org/jfreechart/api/javadoc/org/jfree/data/time/TimeSeriesCollection.html
             TimeSeriesCollection dataset = new TimeSeriesCollection();
             for (String baseItem : baseItems) {
                 JCheckBox cb = new JCheckBox(baseItem, true);
@@ -475,17 +519,21 @@ public class PriceDataVisualizer {
             controlPanel.setMaximumSize(new Dimension(150, 100));
             controlPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+            // Filter buttons
             JButton selectAll = new JButton("Select All");
             JButton deselectAll = new JButton("Deselect All");
             JButton applyFilter = new JButton("Apply Filter");
 
+            // Add action listeners to filter buttons
             selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
             deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
 
+            // Apply filter based on selected checkboxes
             applyFilter.addActionListener(e -> {
                 TimeSeriesCollection filteredDataset = new TimeSeriesCollection();
                 Vector<Vector<Object>> filteredTableContent = new Vector<>();
 
+                // Add selected items to the filtered dataset
                 for (String item : categoryCheckboxes.keySet()) {
                     if (categoryCheckboxes.get(item).isSelected()) {
                         filteredDataset.addSeries(seriesMap.get(item + " (Old)"));
@@ -493,6 +541,7 @@ public class PriceDataVisualizer {
                     }
                 }
 
+                // Filter table data based on selected items
                 for (Vector<Object> row : originalTableData) {
                     String rowItem = row.get(0).toString();
                     if (categoryCheckboxes.containsKey(rowItem) && categoryCheckboxes.get(rowItem).isSelected()) {
@@ -500,6 +549,7 @@ public class PriceDataVisualizer {
                     }
                 }
 
+                // Create a new chart with the filtered dataset
                 JFreeChart filteredChart = createTimeSeriesChart(indexType + " Methodology Comparison", filteredDataset);
                 chartPanel.removeAll();
                 ChartPanel cp = new ChartPanel(filteredChart);
@@ -514,12 +564,14 @@ public class PriceDataVisualizer {
                 displayDataTable.setModel(new DefaultTableModel(filteredTableContent, originalColumnNames));
             });
 
+            // Add buttons to the control panel
             controlPanel.add(selectAll);
             controlPanel.add(deselectAll);
             controlPanel.add(applyFilter);
             checkboxPanel.add(Box.createVerticalStrut(10));
             checkboxPanel.add(controlPanel);
 
+            // Create the default chart when query is loaded
             JFreeChart chart = createTimeSeriesChart(indexType + " Methodology Comparison", dataset);
             ChartPanel cp = new ChartPanel(chart);
             cp.setPreferredSize(new Dimension(700, 400));
@@ -552,6 +604,7 @@ public class PriceDataVisualizer {
             return;
         }
 
+        // Log the query to history
         logQueryToHistory(sql);
         loadQueryHistory();
 
@@ -559,6 +612,7 @@ public class PriceDataVisualizer {
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
+            // Get metadata for the result set and add column names to the table
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
             Vector<String> columnNames = new Vector<>();
@@ -601,6 +655,7 @@ public class PriceDataVisualizer {
             chartPanel.setLayout(new BorderLayout()); // Ensure chartPanel has a layout
             chartPanel.add(cp, BorderLayout.CENTER);
 
+            // Set the table model with the data
             displayDataTable.setModel(new DefaultTableModel(tableData, columnNames));
 
             final Map<String, Map<Integer, Double>> originalDataMap = new LinkedHashMap<>(dataMap);
@@ -610,12 +665,14 @@ public class PriceDataVisualizer {
             checkboxPanel.setLayout(new BoxLayout(checkboxPanel, BoxLayout.Y_AXIS)); // Ensure layout
             categoryCheckboxes.clear();
 
+            // Set up the checkbox panel
             JLabel titleLabel = new JLabel("Select Categories");
             titleLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
             titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
             titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
             checkboxPanel.add(titleLabel);
 
+            // Create checkboxes for each item in the data map
             for (String item : dataMap.keySet()) { // Use dataMap keys for checkboxes
                 JCheckBox box = new JCheckBox(item, true);
                 box.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -625,6 +682,7 @@ public class PriceDataVisualizer {
                 checkboxPanel.add(box);
             }
 
+            // Control buttons
             JPanel controlPanel = new JPanel();
             controlPanel.setLayout(new GridLayout(3, 1, 5, 5));
             controlPanel.setMaximumSize(new Dimension(150, 100));
@@ -637,6 +695,7 @@ public class PriceDataVisualizer {
             selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
             deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
 
+            // Apply filter based on selected checkboxes
             applyFilter.addActionListener(e -> {
                 Map<String, Map<Integer, Double>> filteredChartData = new LinkedHashMap<>();
                 Vector<Vector<Object>> filteredTableContent = new Vector<>(); // For the table
@@ -661,6 +720,7 @@ public class PriceDataVisualizer {
                 DefaultCategoryDataset filteredDataset = createDataset(filteredChartData, years); // Use original 'years'
                 JFreeChart filteredChart = createChart(filteredDataset, indexType + " Forecast Accuracy", minYear, maxYear);
 
+                // Update the chart panel with the filtered chart
                 chartPanel.removeAll();
                 ChartPanel newChartPanel = new ChartPanel(filteredChart);
                 newChartPanel.setPreferredSize(new Dimension(700, 400));
@@ -700,6 +760,8 @@ public class PriceDataVisualizer {
         String table = indexType.equals("Consumer Price Index") ? "historicalcpi" : "historicalppi";
         String itemColumn = indexType.equals("Consumer Price Index") ? "consumerPriceIndexItem" : "producerPriceIndexItem";
 
+        // Embedded SQL query to calculate average percent change based on
+        // dynamic year range
         String sql = String.format("""
     SELECT %s AS item, year, AVG(percentChange) AS avgChange
     FROM %s
@@ -715,6 +777,7 @@ public class PriceDataVisualizer {
             logQueryToHistory(sql);
             loadQueryHistory();
 
+            // Get metadata for the result set and add column names to the table
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
             Vector<String> columnNames = new Vector<>();
@@ -726,6 +789,7 @@ public class PriceDataVisualizer {
             Map<String, Map<Integer, Double>> dataMap = new LinkedHashMap<>(); // For the chart
             Set<Integer> years = new TreeSet<>();
 
+            // Populate table data and chart data based on the query result
             while (rs.next()) {
                 Vector<Object> row = new Vector<>(); // For table
                 for (int i = 1; i <= columnCount; i++) {
@@ -768,6 +832,7 @@ public class PriceDataVisualizer {
             titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
             checkboxPanel.add(titleLabel);
 
+            // Create checkboxes for each item in the data map
             for (String item : dataMap.keySet()) { // Use dataMap keys for checkboxes
                 JCheckBox box = new JCheckBox(item, true);
                 box.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -786,6 +851,7 @@ public class PriceDataVisualizer {
             JButton deselectAll = new JButton("Deselect All");
             JButton applyFilter = new JButton("Apply Filter");
 
+            // Add action listeners to filter buttons
             selectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(true)));
             deselectAll.addActionListener(e -> categoryCheckboxes.values().forEach(cb -> cb.setSelected(false)));
 
@@ -851,6 +917,7 @@ public class PriceDataVisualizer {
      */
     private static DefaultCategoryDataset createDataset(Map<String, Map<Integer, Double>> dataMap, Set<Integer> years) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        // Iterate through the data map and add values to the dataset
         for (Map.Entry<String, Map<Integer, Double>> entry : dataMap.entrySet()) {
             String item = entry.getKey();
             Map<Integer, Double> yearlyData = entry.getValue();
@@ -871,16 +938,21 @@ public class PriceDataVisualizer {
      * @return a JFreeChart object
      */
     private static JFreeChart createChart(DefaultCategoryDataset dataset, String indexType, int yearFrom, int yearTo) {
+        // Create a line chart with the dataset
+        // The chart title, axis labels, and dataset are specified here
+        // Documentation found at https://www.jfree.org/jfreechart/api/javadoc/org/jfree/chart/ChartFactory.html
         JFreeChart chart = ChartFactory.createLineChart(
                 indexType + " Item Volatility (" + yearFrom + "-" + yearTo + ")",
                 "Year", "Avg % Change", dataset
         );
 
+        // Edits the chart appearance
         CategoryPlot plot = chart.getCategoryPlot();
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinePaint(Color.GRAY);
         plot.setRangeGridlinePaint(Color.GRAY);
 
+        // Renderer settings, no shapes and custom line stroke
         LineAndShapeRenderer renderer = (LineAndShapeRenderer) plot.getRenderer();
         renderer.setDefaultShapesVisible(false); // Change to false to hide shapes
         renderer.setDefaultStroke(new BasicStroke(2.0f));
@@ -924,6 +996,7 @@ public class PriceDataVisualizer {
                 new Color(23, 190, 207)    // teal
         };
 
+        // If the index is within the base colors, return the corresponding color
         if (index < baseColors.length) {
             return baseColors[index];
         } else {
@@ -939,6 +1012,7 @@ public class PriceDataVisualizer {
      * @param dataTable the JTable to display the data
      */
     private static void showTableData(String tableName, JTable dataTable) {
+        // Get the SQL query for the selected table
         String sqlKey = "full_data_" + tableName;
         String sql = queryMap.get(sqlKey);
         if (sql == null) return;
@@ -964,6 +1038,7 @@ public class PriceDataVisualizer {
                 double value;
                 String item;
 
+                // Determine the item and value based on the table name
                 if (tableName.equalsIgnoreCase("historicalcpi")) {
                     year = rs.getInt("year");
                     value = rs.getDouble("percentChange");
@@ -1044,6 +1119,7 @@ public class PriceDataVisualizer {
                 List<String> itemLabels = new ArrayList<>(seriesMap.keySet());
                 Collections.sort(itemLabels); // Sort for consistent order
 
+                // Create checkboxes for each series
                 for (String label : itemLabels) {
                     JCheckBox box = new JCheckBox(label, true);
                     box.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -1064,6 +1140,7 @@ public class PriceDataVisualizer {
                 JButton deselectAllButton = new JButton("Deselect All");
                 JButton applyButton = new JButton("Apply Filter");
 
+                // Add action listeners to select/deselect buttons
                 toggleAllButton.addActionListener(e -> {
                     categoryCheckboxes.values().forEach(cb -> cb.setSelected(true));
                 });
@@ -1072,6 +1149,7 @@ public class PriceDataVisualizer {
                     categoryCheckboxes.values().forEach(cb -> cb.setSelected(false));
                 });
 
+                // Apply filter based on selected checkboxes
                 applyButton.addActionListener(e -> {
                     TimeSeriesCollection filtered = new TimeSeriesCollection();
                     for (String label : categoryCheckboxes.keySet()) {
@@ -1080,8 +1158,10 @@ public class PriceDataVisualizer {
                         }
                     }
 
+                    // Create chart with filtered dataset
                     JFreeChart filteredChart = createTimeSeriesChart(tableName, filtered);
 
+                    // Refresh and update the chart panel with the new chart
                     chartPanel.removeAll();
                     ChartPanel cp = new ChartPanel(filteredChart);
                     cp.setPreferredSize(new Dimension(700, 400));
@@ -1113,6 +1193,7 @@ public class PriceDataVisualizer {
                 chartPanel.add(cp, BorderLayout.CENTER);
             }
 
+            // Refresh the chart and checkbox panels
             chartPanel.revalidate();
             chartPanel.repaint();
             checkboxPanel.revalidate();
@@ -1131,9 +1212,12 @@ public class PriceDataVisualizer {
      * @return a JFreeChart object
      */
     private static JFreeChart createTimeSeriesChart(String title, TimeSeriesCollection dataset) {
+        // Create a time series chart with the dataset
+        // Documentation found at https://www.jfree.org/jfreechart/api/javadoc/org/jfree/chart/ChartFactory.html
         JFreeChart chart = ChartFactory.createTimeSeriesChart(
                 title + " Midpoint Forecasts", "Time", "% Change", dataset);
 
+        // Customize the chart appearance
         XYPlot plot = chart.getXYPlot();
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinePaint(Color.GRAY);
@@ -1170,6 +1254,7 @@ public class PriceDataVisualizer {
      * @param dataTable the JTable to display the data
      */
     private static void showForecastChart(String tableName, JTable dataTable) {
+        // Get the SQL query for the selected table
         String sqlKey = "full_data_" + tableName + "_for_2025_bounds";
         String sql = queryMap.get(sqlKey);
         if (sql == null) return;
@@ -1187,6 +1272,10 @@ public class PriceDataVisualizer {
             Map<String, Double> lowerMap = new HashMap<>();
             Map<String, Double> upperMap = new HashMap<>();
 
+            // Iterates through the result set to extract and store data for table display and charting.
+            // Adds each row to a table model, then checks for "Percent change" values only.
+            // Attempts to extract a display label using 'disaggregate' or fallback hierarchy depending on index type (CPI or PPI).
+            // Categorizes and maps forecast values into `lowerMap` and `upperMap` based on whether the attribute is a lower or upper bound.
             while (rs.next()) {
                 Vector<Object> row = new Vector<>();
                 for (int i = 1; i <= columnCount; i++) row.add(rs.getObject(i));
@@ -1235,6 +1324,7 @@ public class PriceDataVisualizer {
             titleLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 10, 5));
             checkboxPanel.add(titleLabel);
 
+            // Create checkboxes for each item in the data map
             DefaultCategoryDataset initialDataset = new DefaultCategoryDataset();
             for (String item : labels) {
                 JCheckBox cb = new JCheckBox(item, true);
@@ -1266,6 +1356,7 @@ public class PriceDataVisualizer {
                 categoryCheckboxes.values().forEach(cb -> cb.setSelected(false));
             });
 
+            // Apply filter based on selected checkboxes
             applyButton.addActionListener(e -> {
                 DefaultCategoryDataset filteredDataset = new DefaultCategoryDataset();
                 for (String item : categoryCheckboxes.keySet()) {
@@ -1277,6 +1368,7 @@ public class PriceDataVisualizer {
 
                 JFreeChart filteredChart = createBarChart(tableName, filteredDataset);
 
+                // Refresh and update the chart panel with the new chart
                 chartPanel.removeAll();
                 ChartPanel cp = new ChartPanel(filteredChart);
                 cp.setPreferredSize(new Dimension(700, 400));
@@ -1324,10 +1416,13 @@ public class PriceDataVisualizer {
      * @return a JFreeChart object
      */
     private static JFreeChart createBarChart(String tableName, DefaultCategoryDataset dataset) {
+        // Create a bar chart with the dataset
+        // Documentation found at https://www.jfree.org/jfreechart/api/javadoc/org/jfree/chart/ChartFactory.html
         JFreeChart chart = ChartFactory.createBarChart(
                 tableName + " 2025 Prediction Intervals",
                 "Item Category", "Percent Change", dataset);
 
+        // Customize the chart appearance
         CategoryPlot plot = chart.getCategoryPlot();
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinePaint(Color.GRAY);
