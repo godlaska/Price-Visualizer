@@ -39,6 +39,11 @@ public class PriceDataVisualizer {
     private static DefaultListModel<String> historyModel = new DefaultListModel<>();
     private static JList<String> historyList = new JList<>(historyModel);
 
+    /**
+     * Starts the application by setting up the database connection, loading
+     * queries, and launching the GUI.
+     * @param args command-line arguments passed to the program
+     */
     public static void main(String[] args) {
         setupConnectionPool();
         try {
@@ -51,6 +56,9 @@ public class PriceDataVisualizer {
         SwingUtilities.invokeLater(PriceDataVisualizer::createAndShowGUI);
     }
 
+    /**
+     * Sets up the HikariCP connection pool for MySQL database access.
+     */
     private static void setupConnectionPool() {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:mysql://localhost:3306/foodprices");
@@ -60,10 +68,21 @@ public class PriceDataVisualizer {
         dataSource = new HikariDataSource(config);
     }
 
+    /**
+     * Establishes a connection to the database using the HikariCP connection pool.
+     * @return a Connection object to interact with the database
+     * @throws SQLException if a database access error occurs
+     */
     public static Connection getConnection() throws SQLException {
         return dataSource.getConnection();
     }
 
+    /**
+     * Loads SQL queries from a specified file into a map.
+     * @param filePath the path to the file containing SQL queries
+     * @return a map of query names to SQL strings
+     * @throws IOException if an error occurs while reading the file
+     */
     public static Map<String, String> loadQueriesFromFile(String filePath) throws IOException {
         Map<String, String> queries = new HashMap<>();
         StringBuilder currentQuery = new StringBuilder();
@@ -90,6 +109,10 @@ public class PriceDataVisualizer {
         return queries;
     }
 
+    /**
+     * Logs a given SQL query to the query_history table in the database.
+     * @param sql the SQL query string to log
+     */
     public static void logQueryToHistory(String sql) {
         String insert = "INSERT INTO query_history (query_text) VALUES (?)";
         try (Connection conn = getConnection();
@@ -101,6 +124,10 @@ public class PriceDataVisualizer {
         }
     }
 
+    /**
+     * Loads the query history from the database and populates the history
+     * list model.
+     */
     public static void loadQueryHistory() {
         historyModel.clear();
         String select = "SELECT query_text FROM query_history ORDER BY run_timestamp DESC";
@@ -116,6 +143,9 @@ public class PriceDataVisualizer {
         }
     }
 
+    /**
+     * Creates and displays the main GUI for the application.
+     */
     private static void createAndShowGUI() {
         JFrame frame = new JFrame("Price Data Visualizer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -337,8 +367,11 @@ public class PriceDataVisualizer {
         frame.setVisible(true);
     }
 
-    // Method to compare old and new forecast methodologies with side-by-side line charts
-// Method to compare old and new forecast methodologies with side-by-side line charts
+    /**
+     * Compares the old and new methodologies for forecasting.
+     * @param indexType the type of index (CPI or PPI)
+     * @param centerPanel the center panel of the GUI
+     */
     private static void runMethodologyComparisonQuery(String indexType, JPanel centerPanel) {
         String sqlKey = indexType.equals("Consumer Price Index") ? "old_vs_new_methodology_cpi" : "old_vs_new_methodology_ppi";
         String sql = queryMap.get(sqlKey);
@@ -490,6 +523,11 @@ public class PriceDataVisualizer {
         }
     }
 
+    /**
+     * Runs the forecast accuracy query and updates the chart and table.
+     * @param indexType the type of index (CPI or PPI)
+     * @param centerPanel the center panel of the GUI
+     */
     private static void runForecastAccuracyQuery(String indexType, JPanel centerPanel) {
         String sqlKey = indexType.equals("Consumer Price Index") ? "forecast_accuracy_cpi" : "forecast_accuracy_ppi";
         String sql = queryMap.get(sqlKey);
@@ -635,6 +673,13 @@ public class PriceDataVisualizer {
         }
     }
 
+    /**
+     * Runs the volatility query and updates the chart and table.
+     * @param indexType the type of index (CPI or PPI)
+     * @param yearFrom starting year for the query
+     * @param yearTo ending year for the query
+     * @param centerPanel the center panel of the GUI
+     */
     private static void runVolatilityQuery(String indexType, int yearFrom, int yearTo, JPanel centerPanel) {
         String table = indexType.equals("Consumer Price Index") ? "historicalcpi" : "historicalppi";
         String itemColumn = indexType.equals("Consumer Price Index") ? "consumerPriceIndexItem" : "producerPriceIndexItem";
@@ -782,7 +827,12 @@ public class PriceDataVisualizer {
         }
     }
 
-    // Helper method to create dataset from data map
+    /**
+     * Creates a dataset for the chart from the given data map and years.
+     * @param dataMap the data map containing item names and their corresponding values
+     * @param years the set of years to include in the dataset
+     * @return a DefaultCategoryDataset object
+     */
     private static DefaultCategoryDataset createDataset(Map<String, Map<Integer, Double>> dataMap, Set<Integer> years) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
         for (Map.Entry<String, Map<Integer, Double>> entry : dataMap.entrySet()) {
@@ -796,7 +846,14 @@ public class PriceDataVisualizer {
         return dataset;
     }
 
-    // Helper method to create chart with consistent styling
+    /**
+     * Creates a chart from the given dataset.
+     * @param dataset the dataset to be used for the chart
+     * @param indexType the type of index (CPI or PPI)
+     * @param yearFrom the starting year for the chart
+     * @param yearTo the ending year for the chart
+     * @return a JFreeChart object
+     */
     private static JFreeChart createChart(DefaultCategoryDataset dataset, String indexType, int yearFrom, int yearTo) {
         JFreeChart chart = ChartFactory.createLineChart(
                 indexType + " Item Volatility (" + yearFrom + "-" + yearTo + ")",
@@ -830,7 +887,12 @@ public class PriceDataVisualizer {
         return chart;
     }
 
-    // Helper method to generate distinct colors for chart series
+    /**
+     * Generates a distinct color based on the index and total number of series.
+     * @param index the index of the series
+     * @param total the total number of series
+     * @return a Color object representing the distinct color
+     */
     private static Color getDistinctColor(int index, int total) {
         // Basic color palette
         Color[] baseColors = {
@@ -855,6 +917,11 @@ public class PriceDataVisualizer {
         }
     }
 
+    /**
+     * Displays the full data for the selected table.
+     * @param tableName the name of the table to display
+     * @param dataTable the JTable to display the data
+     */
     private static void showTableData(String tableName, JTable dataTable) {
         String sqlKey = "full_data_" + tableName;
         String sql = queryMap.get(sqlKey);
@@ -1041,7 +1108,12 @@ public class PriceDataVisualizer {
         }
     }
 
-    // Helper method to create time series chart with consistent styling
+    /**
+     * Creates a time series chart with the given title and dataset.
+     * @param title the title of the chart
+     * @param dataset the dataset to be used for the chart
+     * @return a JFreeChart object
+     */
     private static JFreeChart createTimeSeriesChart(String title, TimeSeriesCollection dataset) {
         JFreeChart chart = ChartFactory.createTimeSeriesChart(
                 title + " Midpoint Forecasts", "Time", "% Change", dataset);
@@ -1076,6 +1148,11 @@ public class PriceDataVisualizer {
         return chart;
     }
 
+    /**
+     * Displays the forecast chart for the selected table.
+     * @param tableName the name of the table to display
+     * @param dataTable the JTable to display the data
+     */
     private static void showForecastChart(String tableName, JTable dataTable) {
         String sqlKey = "full_data_" + tableName + "_for_2025_bounds";
         String sql = queryMap.get(sqlKey);
@@ -1224,7 +1301,12 @@ public class PriceDataVisualizer {
         }
     }
 
-    // Helper method to create bar chart with consistent styling
+    /**
+     * Creates a bar chart with the given dataset.
+     * @param tableName the name of the table to display
+     * @param dataset the dataset to be used for the chart
+     * @return a JFreeChart object
+     */
     private static JFreeChart createBarChart(String tableName, DefaultCategoryDataset dataset) {
         JFreeChart chart = ChartFactory.createBarChart(
                 tableName + " 2025 Prediction Intervals",
@@ -1270,6 +1352,9 @@ public class PriceDataVisualizer {
         return chart;
     }
 
+    /**
+     * Closes the connection pool to the database.
+     */
     private static void closeConnectionPool() {
         if (dataSource != null) dataSource.close();
     }
