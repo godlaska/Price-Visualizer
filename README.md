@@ -69,7 +69,7 @@ Once MySQL Workbench and Server are installed, follow these steps to set up your
 1. Download the repository as a .zip file. Extract the folder in any place. This tutorial will assume it's in the Downloads folder.
 2. Navigate to the following folder in your file explorer:
    ```
-   FinalProject/sql/automaticSetup.sql
+   Price-Visualizer-master/Price-Visualizer-master/sql/automaticSetup.sql
    ```
 3. Open `automaticSetup.sql` and copy all the `CREATE TABLE` statements inside.
 4. Go back to your MySQL Workbench window and make sure the `foodprices` schema is selected.
@@ -99,19 +99,29 @@ Once MySQL Workbench and Server are installed, follow these steps to set up your
    mysql --local_infile=1 -u root -p
    ```
 4. Enter your password (e.g., `pass`).
-5. Select your schema:
+5. Enable file loading
+   ```
+   set global local_infile=true;
+   ```
+7. Select your schema:
    ```sql
    USE foodprices;
    ```
 
-6. To load the data, run the following:
+8. Open load_all_data.sql. This should open mySQLWorkbench. You'll notice each table has "LOAD DATA LOCAL INFILE" then a path to a .csv. Make sure you change the path for each LOAD DATA query. All the data tables can be found in the /dataset folder.
+  - 💡Tip: Right click on each CSV and click 'Copy as Path'. Paste that into the SQL file. From there, you can use that path for the rest of the CSVs. Make sure any backslashes (\\) are changed to forwardslashes (/)!
+  - Once all of the paths are correct, press Ctrl+S to save. This should update the load_all_data.sql file in the folder. Yours should look similar to the image below ⬇️
+<img src="https://github.com/user-attachments/assets/880fab86-2325-40ae-a277-2b66664280da" width="1000"/>
+
+  
+10. To load the data, run the following:
    ```sql
-   SOURCE C:/Users/user/Downloads/FinalProject/sql/load_all_data.sql;
+   SOURCE C:\Users\[YOUR USERNAME]\Downloads\Price-Visualizer-master\Price-Visualizer-master\sql\load_all_data.sql
    ```
    - Make sure to **adjust the path** if your SQL file is in a different location.
    - 💡 Tip: once you navigate to the load_all_data.sql file, right click and click "Copy as Path". You can use this in front of SOURCE.
    - This script contains all `LOAD DATA LOCAL INFILE` commands to populate your tables from CSV files.
 
-📸 *(Insert screenshot of terminal commands and successful import here)*
+<img src="https://github.com/user-attachments/assets/880fab86-2325-40ae-a277-2b66664280da" width="1000"/>
 
 ---
