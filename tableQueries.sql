@@ -43,7 +43,7 @@ SELECT
     f.consumerPriceIndexItem AS item,
     f.yearBeingForecast AS year,
     AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
-FROM CPIHistoricalForecast f  # naming simplification
+FROM CPIHistoricalForecast f
 JOIN historicalcpi h 
   ON f.consumerPriceIndexItem = h.consumerPriceIndexItem 
  AND f.yearBeingForecast = h.year
@@ -56,7 +56,7 @@ SELECT
     f.producerPriceIndexItem AS item,
     f.yearBeingForecast AS year,
     AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
-FROM PPIHistoricalForecast f  # naming simplification
+FROM PPIHistoricalForecast f
 JOIN historicalppi h
   ON f.producerPriceIndexItem = h.producerPriceIndexItem 
  AND f.yearBeingForecast = h.year
@@ -69,15 +69,18 @@ ORDER BY f.producerPriceIndexItem, f.yearBeingForecast;
 SELECT 
     a.consumerPriceIndexItem AS item,
     a.yearBeingForecast AS year,
-    a.monthBeingForecast AS month,
-    a.forecastPercentChange AS old_forecast,
-    h.forecastPercentChange AS new_forecast,
-    (h.forecastPercentChange - a.forecastPercentChange) AS forecast_difference
+    a.monthOfForecast AS month,
+    CAST(a.forecastPercentChange AS DECIMAL(5,2)) AS old_forecast,
+    CAST(h.forecastPercentChange AS DECIMAL(5,2)) AS new_forecast
 FROM cpiforecastarchived a
 JOIN CPIHistoricalForecast h 
   ON a.consumerPriceIndexItem = h.consumerPriceIndexItem
   AND a.yearBeingForecast = h.yearBeingForecast
-  AND a.monthBeingForecast = h.monthBeingForecast
+  AND a.monthOfForecast = h.monthOfForecast
+WHERE LOWER(a.attribute) LIKE '%mid%'
+  AND LOWER(h.attribute) LIKE '%mid%'
+  AND a.forecastPercentChange REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
+  AND h.forecastPercentChange REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
 ORDER BY item, year, month;
 
 -- old_vs_new_methodology_ppi
@@ -85,13 +88,16 @@ ORDER BY item, year, month;
 SELECT 
     a.producerPriceIndexItem AS item,
     a.yearBeingForecast AS year,
-    a.monthBeingForecast AS month,
-    a.forecastPercentChange AS old_forecast,
-    h.forecastPercentChange AS new_forecast,
-    (h.forecastPercentChange - a.forecastPercentChange) AS forecast_difference
+    a.monthOfForecast AS month,
+    CAST(a.forecastPercentChange AS DECIMAL(5,2)) AS old_forecast,
+    CAST(h.forecastPercentChange AS DECIMAL(5,2)) AS new_forecast
 FROM ppiforecastarchived a
 JOIN PPIHistoricalForecast h 
   ON a.producerPriceIndexItem = h.producerPriceIndexItem
   AND a.yearBeingForecast = h.yearBeingForecast
-  AND a.monthBeingForecast = h.monthBeingForecast
+  AND a.monthOfForecast = h.monthOfForecast
+WHERE LOWER(a.attribute) LIKE '%mid%'
+  AND LOWER(h.attribute) LIKE '%mid%'
+  AND a.forecastPercentChange REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
+  AND h.forecastPercentChange REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
 ORDER BY item, year, month;
