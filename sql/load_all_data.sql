@@ -6,66 +6,58 @@
 -- and Producer Price Index (PPI). These tables are used for the application's forecasting,
 -- accuracy analysis, and data visualization features.
 
--- Load PPIForecast
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\PPIForecast.csv'
-INTO TABLE PPIForecast
-FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
-IGNORE 1 LINES;
-
 -- Load CPIForecast
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\CPIForecast.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/CPIForecast.csv'
 INTO TABLE CPIForecast
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load HistoricalPPI
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\historicalppi.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/historicalppi.csv'
 INTO TABLE HistoricalPPI
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load HistoricalCPI
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\historicalcpi.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/historicalcpi.csv'
 INTO TABLE HistoricalCPI
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load PPIForecastArchived
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\PPIForecast_Archived.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/PPIForecast_Archived.csv'
 INTO TABLE PPIForecastArchived
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load CPIForecastArchived
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\CPIForecast_Archived.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/CPIForecast_Archived.csv'
 INTO TABLE CPIForecastArchived
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load PPIHistoricalForecast
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\PPIHistoricalForecast.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/PPIHistoricalForecast.csv'
 INTO TABLE PPIHistoricalForecast
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
 
 -- Load CPIHistoricalForecast
-LOAD DATA LOCAL INFILE 'C:\\Users\\user\\Downloads\\FinalProject\\dataset\\CPIHistoricalForecast.csv'
+LOAD DATA LOCAL INFILE 'C:/Users/capta/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/CPIHistoricalForecast.csv'
 INTO TABLE CPIHistoricalForecast
 FIELDS TERMINATED BY ',' 
-ENCLOSED BY '"'
-LINES TERMINATED BY '\n'
+OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n'
 IGNORE 1 LINES;
