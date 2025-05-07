@@ -172,3 +172,84 @@ To resolve this, we added an `AUTO_INCREMENT` primary key (e.g., `cpiforecast_id
 - 🛠️ **Data safety**: With auto-incrementing IDs, even if multiple rows contain identical data (e.g., two rows with the same item and forecast value), we can still identify and manipulate each row independently without conflict.
 
 In short, adding `AUTO_INCREMENT` IDs was a structural improvement that enabled normalization, future-proofed our design, and supported the advanced querying work seen in this project.
+
+---
+
+### ☕ 5. Install Java 17 (Required for the GUI)
+
+The GUI for Price Visualizer is written in Java and requires **Java 17** to be installed on your system.
+
+#### 🔹 Step-by-Step: Install Java 17 on Windows
+
+1. Go to the official Temurin Java download page:  
+   👉 [https://adoptium.net/en-GB/temurin/releases/?version=17](https://adoptium.net/en-GB/temurin/releases/?version=17)
+
+2. Under **Temurin 17**, select:
+   - Operating System: `Windows`
+   - Architecture: `x64` (most systems)
+   - Package Type: `MSI Installer`
+
+3. Click **Download** and run the installer.
+
+4. During installation:
+   - ✔️ Make sure **"Set JAVA_HOME environment variable"** is checked.
+   - ✔️ Ensure the **PATH variable** is updated so you can run `java` from the command line.
+
+5. To confirm the installation worked:
+   - Open **Command Prompt**
+   - Type:
+     ```bash
+     java -version
+     ```
+   - You should see output that starts with something like:
+     ```
+     openjdk version "17.0.x"
+     ```
+
+📌 Once Java is installed, you’ll be able to launch the GUI using the included `.bat` file (instructions to follow next).
+
+---
+
+### 🚀 6. Launch the GUI Application
+
+Once Java 17 is installed and your database is fully set up, you can launch the Price Visualizer application using the provided batch file.
+
+#### 🔹 How to Run the GUI
+
+1. Open **File Explorer** and navigate to the project directory:
+   ```
+   Price-Visualizer-master/Price-Visualizer-master/
+   ```
+
+2. Look for a file named:
+   ```
+   runVisualizer.bat
+   ```
+
+3. Double-click the `.bat` file to run the application.
+
+💡 If the terminal flashes and disappears, try running it via Command Prompt:
+
+- Open **Command Prompt**
+- Navigate to the folder:
+  ```cmd
+  cd C:\Users\[YOUR USERNAME]\Downloads\Price-Visualizer-master\Price-Visualizer-master
+  ```
+- Then run:
+  ```cmd
+  runVisualizer.bat
+  ```
+
+#### ✅ What Should Happen
+
+- The Java application will launch with a GUI window.
+- You should see a dropdown menu, query options, and a table/chart panel.
+- If you get a database connection error, double-check that:
+  - Your MySQL server is **running**
+  - The username is `root` and password is `pass` (or whatever you set)
+  - The schema `foodprices` exists and contains the expected tables
+
+<img src="https://github.com/user-attachments/assets/36113090-9869-48b3-854c-d0be84339518" width="1000">
+
+---
+Video Demonstration WIP
