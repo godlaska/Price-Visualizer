@@ -1,3 +1,10 @@
+/**
+ * PriceDataVisualizer.java
+ * @author Keigen Godlaski
+ * @version 1.0
+ * @date 2025-05-06
+ */
+
 package org.FinalProject;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -28,6 +35,14 @@ import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
 
+/**
+ * PriceDataVisualizer is a Java application that connects to a MySQL database
+ * to visualize food price data. It allows users to run various SQL queries
+ * and display the results in charts and tables. The application uses
+ * HikariCP for database connection pooling and JFreeChart for charting.
+ * It also provides a GUI for user interaction, including
+ * checkboxes for selecting categories and a history of executed queries.
+ */
 public class PriceDataVisualizer {
     private static HikariDataSource dataSource;
     private static Map<String, String> queryMap = new HashMap<>();
