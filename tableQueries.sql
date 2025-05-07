@@ -43,7 +43,7 @@ SELECT
     f.consumerPriceIndexItem AS item,
     f.yearBeingForecast AS year,
     AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
-FROM CPIHistoricalForecast f
+FROM CPIHistoricalForecast f  # naming simplification
 JOIN historicalcpi h 
   ON f.consumerPriceIndexItem = h.consumerPriceIndexItem 
  AND f.yearBeingForecast = h.year
@@ -56,8 +56,8 @@ SELECT
     f.producerPriceIndexItem AS item,
     f.yearBeingForecast AS year,
     AVG(ABS(f.forecastPercentChange - h.percentChange)) AS mean_absolute_error
-FROM PPIHistoricalForecast f
-JOIN historicalppi h 
+FROM PPIHistoricalForecast f  # naming simplification
+JOIN historicalppi h
   ON f.producerPriceIndexItem = h.producerPriceIndexItem 
  AND f.yearBeingForecast = h.year
 WHERE LOWER(f.attribute) LIKE '%mid%'
