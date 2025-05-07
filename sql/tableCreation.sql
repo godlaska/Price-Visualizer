@@ -1,4 +1,15 @@
 # ----------------- CREATE TABLES FROM CSV -----------------
+-- These CREATE TABLE statements define the database schema used in the
+-- CPI and PPI Forecast Visualization project. Each table corresponds to a
+-- specific dataset related to food price forecasts and historical trends.
+-- 
+-- - ppiforecast / cpiforecast: Current USDA forecasts for Producer and Consumer Price Indices.
+-- - historicalppi / historicalcpi: Actual historical percent changes for each index.
+-- - ppiforecastarchived / cpiforecastarchived: Archived forecasts made using the previous USDA methodology.
+-- - ppihistoricalforecast / cpihistoricalforecast: Forecasts published using the current USDA methodology.
+--
+-- These tables support querying, accuracy analysis, and chart generation within the application.
+
 CREATE TABLE ppiforecast (
     `Producer Price Index item` VARCHAR(255),
     `Attribute` VARCHAR(255),
