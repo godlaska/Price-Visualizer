@@ -253,6 +253,32 @@ Once Java 17 is installed and your database is fully set up, you can launch the 
 If everything worked correctly, this should be the window that pops up...
 <img src="https://github.com/user-attachments/assets/36113090-9869-48b3-854c-d0be84339518" width="1000">
 
-Enjoy exploring this application! Attatched below is a video where I give an overview of all the features and functionality. 
 ---
+
+### 📚 References
+
+This project utilizes the following open-source libraries:
+
+- **HikariCP**
+  - Purpose: Efficient connection pooling for MySQL database access.
+  - Source: [https://github.com/brettwooldridge/HikariCP](https://github.com/brettwooldridge/HikariCP)
+
+- **JFreeChart**
+  - Purpose: Creating charts and visualizations including time series and bar charts.
+  - Source: [https://www.jfree.org/jfreechart/](https://www.jfree.org/jfreechart/)
+
+- **MySQL Connector/J**
+  - Purpose: JDBC driver for connecting Java applications to MySQL databases.
+  - Source: [https://dev.mysql.com/downloads/connector/j/](https://dev.mysql.com/downloads/connector/j/)
+
+- **Java Swing**
+  - Purpose: GUI framework for building the user interface of the application.
+  - Source: Part of the standard Java Development Kit (JDK)
+
+All external libraries are either bundled with the project or should be included via Maven or manual JAR management.
+
+---
+
+## Enjoy exploring this application! Attached below is a video where I give an overview of all the features and functionality. 
+
 Video Demonstration WIP
