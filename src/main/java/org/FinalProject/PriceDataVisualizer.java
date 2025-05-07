@@ -1,6 +1,7 @@
 /**
  * PriceDataVisualizer.java
  * @author Keigen Godlaski
+ * @copyright (c) 2025 Keigen Godlaski
  * @version 1.0
  * @date 2025-05-06
  */
