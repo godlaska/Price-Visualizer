@@ -72,7 +72,7 @@ Once MySQL Workbench and Server are installed, follow these steps to set up your
    Price-Visualizer-master/Price-Visualizer-master/sql/automaticSetup.sql
    ```
 3. Open `automaticSetup.sql` and copy all the `CREATE TABLE` statements inside.
-4. Go back to your MySQL Workbench window and make sure the `foodprices` schema is selected.
+4. Go back to your MySQL Workbench window (this should you have CREATE SCHEMA command at the top) and make sure the `foodprices` schema is bolded.
 5. Paste the copied SQL commands into the query editor at the top.
 6. Highlight all the `CREATE TABLE` commands and click the ⚡ (lightning bolt) icon to run them.
 
@@ -108,20 +108,31 @@ Once MySQL Workbench and Server are installed, follow these steps to set up your
    USE foodprices;
    ```
 
-8. Open load_all_data.sql. This should open mySQLWorkbench. You'll notice each table has "LOAD DATA LOCAL INFILE" then a path to a .csv. Make sure you change the path for each LOAD DATA query. All the data tables can be found in the /dataset folder.
-  - 💡Tip: Right click on each CSV and click 'Copy as Path'. Paste that into the SQL file. From there, you can use that path for the rest of the CSVs. Make sure any backslashes (\\) are changed to forwardslashes (/)!
-  - Once all of the paths are correct, press Ctrl+S to save. This should update the load_all_data.sql file in the folder. Yours should look similar to the image below ⬇️
-<img src="https://github.com/user-attachments/assets/880fab86-2325-40ae-a277-2b66664280da" width="1000"/>
+8. Go back to the file explorer and double click **load_all_data.sql**. This should open mySQLWorkbench.
+
+9. You'll notice each table has "LOAD DATA LOCAL INFILE" then a path to a .csv. Make sure you change the path for each LOAD DATA query. All the data tables can be found in the /dataset folder.
+  - 💡Tip: Right click on each CSV and click 'Copy as Path'. Paste that into the SQL file. From there, you can use that path for the rest of the CSVs. **Make sure any backslashes (\\) are changed to forwardslashes (/)!**
+  - If your file path is similar to mine, feel free to use this template...
+  ```
+  'C:/Users/[YOUR USERNAME]/Downloads/Price-Visualizer-master/Price-Visualizer-master/dataset/[datatable-name].csv'
+  ```
+  - Once all of the paths are correct, press Ctrl+S to save. This should update the load_all_data.sql file in the folder. Yours should look similar to the image below...
+<img src="https://github.com/user-attachments/assets/afeda17c-06f7-467f-861d-0e9c40e540c2" width="1000"/>
 
   
-10. To load the data, run the following:
+10. To load the data, run the following in command prompt:
    ```sql
    SOURCE C:\Users\[YOUR USERNAME]\Downloads\Price-Visualizer-master\Price-Visualizer-master\sql\load_all_data.sql
    ```
    - Make sure to **adjust the path** if your SQL file is in a different location.
    - 💡 Tip: once you navigate to the load_all_data.sql file, right click and click "Copy as Path". You can use this in front of SOURCE.
    - This script contains all `LOAD DATA LOCAL INFILE` commands to populate your tables from CSV files.
+   - If everything is correct, you should see 8 lines that say 'QUERY OK'.
 
-<img src="https://github.com/user-attachments/assets/880fab86-2325-40ae-a277-2b66664280da" width="1000"/>
+<img src="https://github.com/user-attachments/assets/bf36fa88-f574-469d-afe6-fa71f3081395" width="1000"/>
+
+You can check if this worked by going back to your local instance of MySQL and clicking refresh, hovering over a table, and clicking the little lightning bolt in the window.
+
+<img src="https://github.com/user-attachments/assets/ed5901d2-95a6-4bfd-a02f-ca63b1eb721c" width="1000"/>
 
 ---
