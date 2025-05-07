@@ -281,4 +281,8 @@ All external libraries are either bundled with the project or should be included
 
 ## Enjoy exploring this application! Attached below is a video where I give an overview of all the features and functionality. 
 
+### All Features
+ - WIP
+
+### Video
 Video Demonstration WIP
