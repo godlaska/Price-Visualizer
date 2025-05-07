@@ -69,7 +69,15 @@ CREATE TABLE cpihistoricalforecast (
 
 -- END OF tableCreation.sql --
 
-# !! Make sure to import the CSV data before going to the next step!
+
+
+
+
+# !!!!!!!!!!! Make sure to import the CSV data before going to the next step. Instructions are in the README !!!!!!!!!!!
+
+
+
+
 
 -- START OF IDCreation.sql --
 # ----------------- ADD INCREMENTING ID (PRIMARY KEY) -----------------
