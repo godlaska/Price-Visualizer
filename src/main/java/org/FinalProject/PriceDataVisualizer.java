@@ -63,7 +63,7 @@ public class PriceDataVisualizer {
     public static void main(String[] args) {
         setupConnectionPool();
         try {
-            queryMap = loadQueriesFromFile("tableQueries.sql");
+            queryMap = loadQueriesFromFile("sql/tableQueries.sql");
         } catch (IOException e) {
             System.err.println("Failed to load queries from file: tableQueries.sql");
             e.printStackTrace();
