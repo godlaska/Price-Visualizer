@@ -311,7 +311,7 @@ The Price Visualizer application includes a variety of powerful features that he
 ---
 
 #### 📉 3. Volatility Analysis
-- **What it does**: Measures volatility using average annual percent change for each category.
+- **What it does**: Measures volatility using average annual percent change for each category through the use of embedded SQL.
 - **How to use**:
   1. Select **"Volatility"** from the Query dropdown.
   2. Choose CPI or PPI.
