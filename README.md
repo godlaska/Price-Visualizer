@@ -375,6 +375,7 @@ This feature set was designed to make food price data more transparent, explorab
 ### Video Demonstration
 [![Watch the video](https://img.youtube.com/vi/_FJNlkkfkjg/0.jpg)](https://youtu.be/_FJNlkkfkjg)
 
+> 🔗 *Click the image to watch the video! This will redirect you off of GitHub to Youtube.*
 ---
 
 ## 📁 File Tree
