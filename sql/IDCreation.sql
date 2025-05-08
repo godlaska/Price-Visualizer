@@ -1,9 +1,8 @@
-# ----------------- ADD INCREMENTING ID (PRIMARY KEY) -----------------
-
 # The purpose of these auto incremented keys is to add a primary key
-# to all the tables as they don't explicitly have one. More details
-# can be found in the documentation.
+# to all the tables as they don't explicitly have one. More specific details
+# can be found in the ER diagram.
 
+# ----------------- ADD INCREMENTING ID (PRIMARY KEY) -----------------
 ALTER TABLE cpiforecast
 ADD COLUMN cpiforecast_id INT AUTO_INCREMENT PRIMARY KEY FIRST;
 

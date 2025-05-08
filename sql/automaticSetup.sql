@@ -1,3 +1,8 @@
+# Purpose: This script serves as a full setup pipeline for the database.
+# It sequentially creates all necessary tables, assigns IDs, formats columns,
+# creates the query history table, and loads data from CSV files.
+# This script is designed to be run in two parts to fully initialize the system.
+
 -- START OF tableCreation.sql --
 # ----------------- CREATE TABLES FROM CSV -----------------
 CREATE TABLE ppiforecast (

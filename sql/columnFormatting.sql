@@ -1,3 +1,6 @@
+# Purpose: Applies final formatting and type casting to selected columns across tables.
+# Used after raw data import to ensure consistent column types and values for queries.
+
 # ----------------- FORMATS THE ORIGINAL COLUMN HEADERS -----------------
 # PPI Forecast
 ALTER TABLE PPIForecast CHANGE `Producer Price Index item` `producerPriceIndexItem` VARCHAR(255);
