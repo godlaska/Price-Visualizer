@@ -374,3 +374,49 @@ This feature set was designed to make food price data more transparent, explorab
 
 ### Video Demonstration
 Video Demonstration WIP
+
+---
+
+## 📁 File Tree
+
+```
+├── price_visualizer_extracted/
+│   ├── Price-Visualizer-master/
+│   │   ├── .gitignore
+│   │   ├── README.md
+│   │   ├── pom.xml
+│   │   ├── runVisualizer.bat
+│   │   ├── .idea/
+│   │   │   ├── .gitignore
+│   │   │   ├── encodings.xml
+│   │   │   ├── misc.xml
+│   │   │   ├── vcs.xml
+│   │   ├── dataset/
+│   │   │   ├── CPIForecast.csv
+│   │   │   ├── CPIForecast_Archived.csv
+│   │   │   ├── CPIHistoricalForecast.csv
+│   │   │   ├── PPIForecast.csv
+│   │   │   ├── PPIForecast_Archived.csv
+│   │   │   ├── PPIHistoricalForecast.csv
+│   │   │   ├── historicalcpi.csv
+│   │   │   ├── historicalppi.csv
+│   │   ├── documentation/
+│   │   │   ├── CSE385 - ADP1.pdf
+│   │   │   ├── PriceVisualizer.drawio.pdf
+│   │   │   ├── PriceVisualizer.drawio.xml
+│   │   ├── sql/
+│   │   │   ├── IDCreation.sql
+│   │   │   ├── automaticSetup.sql
+│   │   │   ├── columnFormatting.sql
+│   │   │   ├── historyTableCreation.sql
+│   │   │   ├── load_all_data.sql
+│   │   │   ├── tableCreation.sql
+│   │   │   ├── tableQueries.sql
+│   │   ├── src/
+│   │   │   ├── main/
+│   │   │   │   ├── java/
+│   │   │   │   │   ├── org/
+│   │   │   │   │   │   ├── FinalProject/
+│   │   │   │   │   │   │   ├── PriceDataVisualizer.java
+```
+
