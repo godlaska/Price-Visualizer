@@ -274,6 +274,10 @@ This project utilizes the following open-source libraries:
 - **Java Swing**
   - Purpose: GUI framework for building the user interface of the application.
   - Source: Part of the standard Java Development Kit (JDK)
+ 
+- **Food Price Outlook Dataset**
+  - **Purpose**: Core dataset used for all querying, analysis, and visualization within the application.
+  - **Source**: [USDA Economic Research Service – Food Price Outlook](https://www.ers.usda.gov/data-products/food-price-outlook)
 
 All external libraries are either bundled with the project or should be included via Maven or manual JAR management.
 
