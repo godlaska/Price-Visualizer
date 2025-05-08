@@ -402,6 +402,7 @@ This feature set was designed to make food price data more transparent, explorab
 │   │   │   ├── historicalppi.csv
 │   │   ├── documentation/
 │   │   │   ├── CSE385 - ADP1.pdf
+│   │   │   ├── Price-Visualizer-Demonstration.mp4
 │   │   │   ├── PriceVisualizer.drawio.pdf
 │   │   │   ├── PriceVisualizer.drawio.xml
 │   │   ├── sql/
