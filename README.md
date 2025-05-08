@@ -373,7 +373,7 @@ The Price Visualizer application includes a variety of powerful features that he
 This feature set was designed to make food price data more transparent, explorable, and insightful for analysis.
 
 ### Video Demonstration
-Video Demonstration WIP
+[![Watch the video](https://img.youtube.com/vi/_FJNlkkfkjg/0.jpg)](https://youtu.be/_FJNlkkfkjg)
 
 ---
 
